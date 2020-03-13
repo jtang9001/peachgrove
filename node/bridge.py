@@ -14,14 +14,16 @@ from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
 from tf.transformations import quaternion_from_euler
 import random
+import time
 from math import pi
 
 class image_converter:
 
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/camera1/image_raw", Image, self.callback, queue_size=1)
+        self.image_sub = rospy.Subscriber("/rrbot/camera1/image_raw", Image, self.callback, queue_size=1)
         self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
+        self.rate = rospy.Rate(1)
 
     def callback(self,data):
         try:
@@ -30,25 +32,28 @@ class image_converter:
             print(e)
             return
 
-        quat = quaternion_from_euler(0,0,random.random() * 2 * pi)
+        quat = quaternion_from_euler(0,0,random.random()*2*pi)
 
         state_msg = ModelState()
         state_msg.model_name = "lab_robot"
         state_msg.pose.position.x = random.random()
-        state_msg.pose.position.y = 0
-        state_msg.pose.position.z = random.random()
+        state_msg.pose.position.y = random.random()
+        state_msg.pose.position.z = -0.05
         state_msg.pose.orientation.x = quat[0]
         state_msg.pose.orientation.y = quat[1]
         state_msg.pose.orientation.z = quat[2]
         state_msg.pose.orientation.w = quat[3]
-
-        input("Press enter to continue")
+        rospy.loginfo(state_msg.pose.position.x)
+        rospy.loginfo(state_msg.pose.position.y)
+        rospy.loginfo(quat)
+        self.pub.publish(state_msg)
+        self.rate.sleep()
         
 
 def main(args):
     
-    ic = image_converter()
     rospy.init_node('image_converter', anonymous=True)
+    ic = image_converter()
 
     try:
         rospy.spin()
