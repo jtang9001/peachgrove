@@ -72,12 +72,13 @@ class image_converter:
 
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/rrbot/camera1/image_raw", Image, self.callback, queue_size=1)
+        #self.image_sub = rospy.Subscriber("/rrbot/camera1/image_raw", Image, self.callback, queue_size=1)
         self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
-        self.rate = rospy.Rate(0.5)
+        self.rate = rospy.Rate(0.25)
         self.counter = 0
+        time.sleep(1)
 
-    def callback(self,data):
+    def main(self):
         if self.counter > 1000:
             return
 
@@ -88,21 +89,23 @@ class image_converter:
 
         rospy.wait_for_service("/gazebo/set_model_state")
         self.pub.publish(stateMsg)
+        time.sleep(1)
 
+        
+
+        outimg = "output/{counter}_{posn.error:.5f}_{regionnum}_{posn.x:.3f}_{posn.y:.3f}_{posn.yaw:.3f}.jpg".format(
+            counter = self.counter, regionnum = regionnum, posn = posn) 
         try:
             msg = rospy.wait_for_message("/rrbot/camera1/image_raw", Image)
             cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
         except CvBridgeError as e:
             print(e)
             return
-
-        
-        outimg = "output/{counter}_{posn.error:.5f}_{regionnum}_{posn.x:.3f}_{posn.y:.3f}_{posn.yaw:.3f}.jpg".format(
-            counter = self.counter, regionnum = regionnum, posn = posn) 
         saved = cv2.imwrite(outimg, cv_image)
         rospy.loginfo(outimg)
         # rospy.loginfo(saved)
         self.counter += 1
+        time.sleep(1)
         self.rate.sleep()
         
 
@@ -111,11 +114,7 @@ def main(args):
     rospy.init_node('image_converter', anonymous=True)
     ic = image_converter()
 
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print("Shutting down")
-
-    cv2.destroyAllWindows()
+    while not rospy.is_shutdown():
+        ic.main()
     
 main(sys.argv)
