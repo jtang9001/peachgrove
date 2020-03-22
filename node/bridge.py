@@ -76,10 +76,9 @@ class image_converter:
         self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
         self.rate = rospy.Rate(0.25)
         self.counter = 0
-        time.sleep(1)
 
     def main(self):
-        if self.counter > 1000:
+        if self.counter > 100:
             return
 
         regionnum = random.randint(0, len(REGIONS) - 1)
@@ -89,7 +88,6 @@ class image_converter:
 
         rospy.wait_for_service("/gazebo/set_model_state")
         self.pub.publish(stateMsg)
-        time.sleep(1)
 
         
 
@@ -105,7 +103,6 @@ class image_converter:
         rospy.loginfo(outimg)
         # rospy.loginfo(saved)
         self.counter += 1
-        time.sleep(1)
         self.rate.sleep()
         
 
