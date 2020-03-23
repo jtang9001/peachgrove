@@ -19,24 +19,24 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from vanishpt import analyze
 
-P_COEFF = -2.5
-I_COEFF = -0.06
-D_COEFF = -20
-INTEGRAL_LENGTH = 80
-MINSPEED = 0.04
+P_COEFF = -2
+I_COEFF = -0.03
+D_COEFF = 0
+INTEGRAL_LENGTH = 40
+MINSPEED = 0.02
 def getSpeedFromError(error):
     if error < 0:
         error *= -1
-    return max(MINSPEED, 0.5-error)
+    return max(MINSPEED, 0.2-error)
 
 class image_converter:
 
     def __init__(self):
-        #self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image", Image, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback)
-        #self.integral = deque(maxlen=INTEGRAL_LENGTH)
+        self.integral = deque(maxlen=INTEGRAL_LENGTH)
 
     def callback(self,data):
         try:
@@ -45,33 +45,33 @@ class image_converter:
             print(e)
             return
 
-        #move = Twist()
+        move = Twist()
         try:
-            lines, frame = analyze(cv_image)
-            print(len(lines))
-            # self.integral.append(xFrac)
-            # intTerm = sum(self.integral)
-            # try:
-            #     derivTerm = self.integral[-1] - self.integral[-3]
-            # except Exception:
-            #     derivTerm = 0
+            xFrac, frame = analyze(cv_image)
 
-            # move.linear.x = getSpeedFromError(xFrac)
-            # move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF + derivTerm * D_COEFF
+            self.integral.append(xFrac)
+            intTerm = sum(self.integral)
+            try:
+                derivTerm = self.integral[-1] - self.integral[-3]
+            except Exception:
+                derivTerm = 0
+
+            move.linear.x = getSpeedFromError(xFrac)
+            move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF + derivTerm * D_COEFF
             # pidStr = "P = %(error).2f, I = %(integral).2f, D = %(deriv).2f" % {"error": xFrac, "integral": intTerm, "deriv": derivTerm}
             # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": move.angular.z, "vel": move.linear.x}
-            # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0), thickness=1)
-            # cv2.putText(frame, outStr, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0), thickness=1)
+            # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
+            # cv2.putText(frame, outStr, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
         except Exception:
             rospy.logwarn(traceback.format_exc())
-            #self.integral.clear()
+            self.integral.clear()
             frame = cv_image
-            # move.linear.x = 0.35
-            # move.angular.z = 1
-            # cv2.putText(frame, "No contour", (20,20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0), thickness=1)
+            move.linear.x = 0
+            move.angular.z = -0.3
+            cv2.putText(frame, "No vanishing point", (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=3)
 
         try:
-            #self.pub.publish(move)
+            self.pub.publish(move)
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "bgr8"))
         except CvBridgeError as e:
             print(e)

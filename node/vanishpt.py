@@ -3,6 +3,7 @@ from __future__ import division
 
 import cv2
 import numpy as np
+import itertools
 pi = np.pi
 
 GREEN = (0,255,0)
@@ -27,6 +28,12 @@ class Line:
     def solveForY(self, y):
         return (y - self.y1)/self.slope + self.x1
     
+    def findIsectWith(self, other):
+        if self.slope == other.slope:
+            return None
+        isectX = (other.y1 - self.y1 - other.slope*other.x1 + self.slope*self.x1)/(self.slope - other.slope)
+        return (isectX, self.evalForX(isectX))
+
     def draw(self, frame, color = GREEN, thickness = 1):
         cv2.line(
             frame, (self.x1, self.y1), (self.x2, self.y2),
@@ -74,7 +81,7 @@ def drawLinesOnBlank(lines, width, height):
 #     cv2.morphologyEx(img2, cv2.MORPH_CLOSE, kernel)
 #     return img2
 
-def findCrossings(lines):
+def findVanishingPt(lines, width, height):
     uniqueLines = [lines[0]]
     for line in lines:
         addLine = True
@@ -87,7 +94,15 @@ def findCrossings(lines):
         if addLine:
             uniqueLines.append(line)
 
-    return uniqueLines
+    isects = []
+    weights = []
+    for lineA, lineB in itertools.combinations(uniqueLines, 2):
+        isect = lineA.findIsectWith(lineB)
+        if isect is not None and 0 <= isect[0] <= width and height*0.35 <= isect[1] <= height*0.65:
+            isects.append(isect)
+            weights.append(abs(lineA.slope - lineB.slope))
+    
+    return np.average(np.array(isects), axis = 0, weights=weights), uniqueLines
 
 
 
@@ -102,8 +117,9 @@ def analyze(frame):
     maxLineGap = 10
     lines = cv2.HoughLinesP(edgedImg, 1, pi/180, lineThreshold, minLineLength, maxLineGap)
     
-    retFrame = cv2.cvtColor(edgedImg, cv2.COLOR_GRAY2BGR)
-    
+    #retFrame = cv2.cvtColor(edgedImg, cv2.COLOR_GRAY2BGR)
+    retFrame = frame.copy()
+
     diagLines = []
     for line in lines:
         #x1, y1, x2, y2 = line[0]
@@ -111,10 +127,11 @@ def analyze(frame):
         if 0.1 < abs(lineObj.slope) < 10:
             diagLines.append(lineObj)
 
-    uniqueLines = findCrossings(diagLines)
+    vanishPt, uniqueLines = findVanishingPt(diagLines, width, height)
     for line in uniqueLines:
         line.drawInf(retFrame)
+    cv2.circle(retFrame, (int(round(vanishPt[0])), int(round(vanishPt[1]))), 5, RED, -1)
 
     #retFrame = drawLinesOnBlank(diagLines, width, height)
 
-    return diagLines, retFrame
+    return (vanishPt[0] / width) - 0.5, retFrame
