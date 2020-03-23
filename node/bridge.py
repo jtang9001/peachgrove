@@ -63,47 +63,64 @@ class Position:
         return state_msg
 
 REGIONS = [
-    Region((-2.4, -2.4), (-1.75, 1.75), pi/4, (-2.1, 2.5)),
-    Region((-2.4, 1.75), (-1.75, 2.3), pi/2, (2.5, 2.1), angleOffset=pi/4),
-    Region((-1.75, 1.75), (1.75, 2.4), pi/4, (2.5, 2.1))
+    Region((-2.4, -2.4), (-1.8, 1.8), pi/5, (-2.2, 2.5)),
+    Region((-2.4, 1.8), (-1.8, 2.3), pi/2, (2.5, 2.2), angleOffset=pi/4),
+    Region((-1.8, 1.8), (1.8, 2.4), pi/5, (2.5, 2.2))
 ]
 
 class image_converter:
 
     def __init__(self):
         self.bridge = CvBridge()
-        #self.image_sub = rospy.Subscriber("/rrbot/camera1/image_raw", Image, self.callback, queue_size=1)
+        self.image_sub = rospy.Subscriber("/rrbot/camera1/image_raw", Image, self.callback, queue_size=1, buff_size=2**24)
         self.pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
-        self.rate = rospy.Rate(0.25)
-        self.counter = 0
+        self.image_pub = rospy.Publisher("/annotated_image", Image, queue_size=1)
+        self.rate = rospy.Rate(1)
+        self.counter = 2
 
-    def main(self):
-        if self.counter > 100:
+
+        self.posns = []
+        for _ in range(1002):
+            regionnum = random.randint(0, len(REGIONS) - 1)
+            region = REGIONS[regionnum]
+            posn = region.makePosition()
+            self.posns.append(posn)
+
+
+    def callback(self, data):
+        try:
+            posn = self.posns[self.counter]
+            stateMsg = posn.makeModelState()
+        except Exception:
             return
 
-        regionnum = random.randint(0, len(REGIONS) - 1)
-        region = REGIONS[regionnum]
-        posn = region.makePosition()
-        stateMsg = posn.makeModelState()
-
-        rospy.wait_for_service("/gazebo/set_model_state")
+        #rospy.wait_for_service("/gazebo/set_model_state")
         self.pub.publish(stateMsg)
 
-        
+        self.outimgname = "output/{counter}_{posn.error:.5f}_{posn.x:.3f}_{posn.y:.3f}.jpg".format(
+            counter = self.counter, posn = self.posns[self.counter - 2]) 
+        self.caption = "{counter} {posn.error:.5f}".format(
+            counter = self.counter, posn = self.posns[self.counter - 2]) 
 
-        outimg = "output/{counter}_{posn.error:.5f}_{regionnum}_{posn.x:.3f}_{posn.y:.3f}_{posn.yaw:.3f}.jpg".format(
-            counter = self.counter, regionnum = regionnum, posn = posn) 
         try:
-            msg = rospy.wait_for_message("/rrbot/camera1/image_raw", Image)
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            #data = rospy.wait_for_message("/rrbot/camera1/image_raw", Image)
+            cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            annotated_image = cv_image.copy()
+            cv2.putText(annotated_image, self.caption, (0,80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), thickness=2)
+            self.image_pub.publish(self.bridge.cv2_to_imgmsg(annotated_image, "bgr8"))
         except CvBridgeError as e:
             print(e)
             return
-        saved = cv2.imwrite(outimg, cv_image)
-        rospy.loginfo(outimg)
+        #saved = cv2.imwrite(self.outimgname, cv_image)
+        rospy.loginfo(self.outimgname)
         # rospy.loginfo(saved)
         self.counter += 1
+
+        if self.counter > 1002:
+            return
+
         self.rate.sleep()
+        
         
 
 def main(args):
@@ -111,7 +128,14 @@ def main(args):
     rospy.init_node('image_converter', anonymous=True)
     ic = image_converter()
 
-    while not rospy.is_shutdown():
-        ic.main()
+    # while not rospy.is_shutdown():
+    #     ic.callback()
+
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("Shutdown")
+    cv2.destroyAllWindows()
     
-main(sys.argv)
+if __name__ == "__main__":
+    main(sys.argv)
