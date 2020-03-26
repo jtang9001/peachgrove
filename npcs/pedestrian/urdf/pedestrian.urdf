@@ -10,7 +10,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="package://enph353_npcs/agents/pedestrian/meshes/walking.dae" scale="0.3 0.3 0.3"/>
+        <mesh filename="package://competition_2019t2/npcs/pedestrian/meshes/walking.dae" scale="0.3 0.3 0.3"/>
       </geometry>
     </visual>
     <collision>
