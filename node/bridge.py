@@ -5,6 +5,7 @@ from __future__ import division
 import sys
 from collections import deque
 import traceback
+import time
 
 import roslib
 roslib.load_manifest('competition_2019t2')
@@ -18,25 +19,32 @@ from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 
 from vanishpt import analyze
+import plates
+import pedestrians
 
 P_COEFF = -2
-I_COEFF = -0.03
+I_COEFF = -0.02
 D_COEFF = 0
-INTEGRAL_LENGTH = 40
+INTEGRAL_LENGTH = 50
 MINSPEED = 0.02
+MAXSPEED = 0.2
 def getSpeedFromError(error):
     if error < 0:
         error *= -1
-    return max(MINSPEED, 0.2-error)
+    return max(MINSPEED, MAXSPEED-error)
 
 class image_converter:
 
     def __init__(self):
+        self.startTime = rospy.get_rostime()
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image", Image, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback)
         self.integral = deque(maxlen=INTEGRAL_LENGTH)
+        self.odometer = 0
+        self.lengths = 0
+
 
     def callback(self,data):
         try:
@@ -47,7 +55,11 @@ class image_converter:
 
         move = Twist()
         try:
-            xFrac, frame = analyze(cv_image)
+            xFrac, vanishPtFrame = analyze(cv_image)
+            rects, threshedFrame = plates.getPlates(cv_image)
+
+            cv2.drawContours(threshedFrame, [rect.contour for rect in rects], -1, (255,0,0), 2)
+            frame = threshedFrame
 
             self.integral.append(xFrac)
             intTerm = sum(self.integral)
@@ -56,19 +68,35 @@ class image_converter:
             except Exception:
                 derivTerm = 0
 
-            move.linear.x = getSpeedFromError(xFrac)
-            move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF + derivTerm * D_COEFF
+            if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(20) or pedestrians.canDrive(cv_image):
+                move.linear.x = 0
+                move.angular.z = 0
+
+            else:
+                move.linear.x = getSpeedFromError(xFrac)
+                move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF + derivTerm * D_COEFF
+
+            self.odometer += move.linear.x
             # pidStr = "P = %(error).2f, I = %(integral).2f, D = %(deriv).2f" % {"error": xFrac, "integral": intTerm, "deriv": derivTerm}
             # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": move.angular.z, "vel": move.linear.x}
             # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
-            # cv2.putText(frame, outStr, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
-        except Exception:
-            rospy.logwarn(traceback.format_exc())
+            cv2.putText(frame, str(round(self.odometer, 2)), (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=2)
+        
+        except ZeroDivisionError:
             self.integral.clear()
             frame = cv_image
-            move.linear.x = 0
+            move.linear.x = 0.01
             move.angular.z = -0.3
-            cv2.putText(frame, "No vanishing point", (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=3)
+            cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
+            if self.odometer > 40:
+                self.odometer = 0
+                self.lengths += 1
+                rospy.loginfo("Now on lap: ")
+                rospy.loginfo(self.lengths)
+        
+        except Exception:
+            rospy.logwarn(traceback.format_exc())
+
 
         try:
             self.pub.publish(move)
@@ -78,8 +106,8 @@ class image_converter:
 
 def main(args):
     
-    ic = image_converter()
     rospy.init_node('image_converter', anonymous=True)
+    ic = image_converter()
 
     try:
         rospy.spin()
