@@ -8,13 +8,13 @@ except ImportError:
     import Image
 import pytesseract
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-POLY_APPROX_COEFF = 0.04
+POLY_APPROX_COEFF = 0.03
 
 RECT_MIN_AR = 1 #min aspect ratio
 RECT_MAX_AR = 2.5 #max aspect ratio
-RECT_MIN_AREA = 10
+RECT_MIN_AREA = 500
 RECT_MAX_AREA = 10000
 RECT_MIN_BBOX_FILL = 0.1 #min pct that rect contour fills its minimal bounding box
 
@@ -102,7 +102,7 @@ class PlateRect:
 
     def ocrFrame(self):
         img_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
-        self.ocrStr = pytesseract.image_to_string(img_rgb)
+        self.ocrStr = pytesseract.image_to_string(img_rgb).encode("ascii", "ignore")
         return self.ocrStr
 
 def auto_canny(image, sigma=.8):
@@ -129,7 +129,7 @@ def threshImg(grayImg, exposure = -2, kernel_size = 75):
     #kernel = np.ones((3,3), np.uint8) 
     #dilatedImg = cv2.dilate(threshedImg, kernel, iterations=1)
     #threshedImg = auto_canny(blurImg, sigma=0.1)
-    threshedImg = cv2.Canny(grayImg, 50, 100)
+    threshedImg = cv2.Canny(grayImg, 35, 70)
     return threshedImg
 
 def simplifyContour(contour, simplifyCoeff = POLY_APPROX_COEFF):
@@ -137,7 +137,7 @@ def simplifyContour(contour, simplifyCoeff = POLY_APPROX_COEFF):
     approxCnt = cv2.approxPolyDP(contour, simplifyCoeff*perimeter, True)
     return approxCnt
 
-def getPlates(frame, min_size = 50):
+def getPlates(frame):
     greyFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     threshedImg = threshImg(greyFrame)
 
@@ -147,13 +147,14 @@ def getPlates(frame, min_size = 50):
     for contour in contours:
         approxCnt = simplifyContour(contour)
         if len(approxCnt) == 4:
-            plate = PlateRect(approxCnt, frame)
+            plate = PlateRect(approxCnt, greyFrame)
             if all((
                 RECT_MIN_AREA <= plate.contourArea <= RECT_MAX_AREA,
                 RECT_MIN_AR < plate.aspectRatio < RECT_MAX_AR,
                 plate.contourArea / plate.boundingBoxArea >= RECT_MIN_BBOX_FILL
             )):
                 rects.append(plate)
+                print(plate.contourArea)
 
     return (
         sorted(rects, key=lambda rect: rect.contourArea), 
