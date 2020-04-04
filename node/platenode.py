@@ -22,7 +22,7 @@ class PlateReader:
 
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback)
+        self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback, buff_size=2**24)
         self.image_pub = rospy.Publisher("/annotated_image_plates", Image, queue_size=1)
         self.framenum = 0
 

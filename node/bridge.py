@@ -23,6 +23,8 @@ from vanishpt import analyze, NoVanishingPointException
 from plates import getPlates, PlateRect
 #import pedestrians
 
+TURN_START = 2.5
+
 P_COEFF = -2
 I_COEFF = -0.02
 D_COEFF = 0
@@ -49,6 +51,7 @@ class image_converter:
         self.lastTickTime = rospy.get_rostime()
         self.frame = None
         self.move = None
+        self.localTurnHeading = 0
 
     def callback(self,data):
         try:
@@ -63,6 +66,11 @@ class image_converter:
         self.move = Twist()
         try:
             xFrac, vanishPtFrame = analyze(cv_image)
+
+            rects, threshedFrame = getPlates(cv_image)
+
+            cv2.drawContours(vanishPtFrame, [rect.contour for rect in rects], -1, (255,255,0), 2)
+
             self.frame = vanishPtFrame
 
             self.integral.append(xFrac)
@@ -77,12 +85,14 @@ class image_converter:
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
-            elif self.lengths == 1 and 2.2 < self.odometer < 2.5 and self.heading > -6.6:
+            elif self.lengths % 2 == 1 and TURN_START < self.odometer < TURN_START + 0.4:# and self.localTurnHeading > -17.6:
                 #rospy.loginfo("In turning override")
-                self.move.linear.x = 0.02
-                self.move.angular.z = -0.3
+                self.move.linear.x = 0.01
+                self.move.angular.z = -0.35
+                #self.localTurnHeading += self.move.angular.z * tickDuration
 
             else:
+                #self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
                 self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
 
@@ -105,17 +115,18 @@ class image_converter:
             self.heading += self.move.angular.z * tickDuration
             #self.heading = self.heading % 17.6
             self.pub.publish(self.move)
-            odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.heading, "length": self.lengths}
+            odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
             cv2.putText(self.frame, odomStr, (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,0,0), thickness=2)
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.frame, "bgr8"))
 
     def turnCorner(self):
         self.integral.clear()
-        if -6.4 > self.heading > -10.5:
-            rospy.loginfo("In special turn speed regime")
-            self.move.linear.x = 0.15
-        else:
-            self.move.linear.x = 0.01
+        # if -6.4 > self.heading > -10.5:
+        #     rospy.loginfo("In special turn speed regime")
+        #     self.move.linear.x = 0.15
+        # else:
+        #     self.move.linear.x = 0.01
+        self.move.linear.x = 0.05
         self.move.angular.z = -0.35
         #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
         if self.odometer > 3.5:
