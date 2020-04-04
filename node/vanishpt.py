@@ -11,6 +11,9 @@ BLUE = (255,0,0)
 RED = (0,0,255)
 WHITE = (255,255,255)
 
+class NoVanishingPointException(Exception):
+    pass
+
 class Line:
     def __init__(self, x1, y1, x2, y2):
         self.x1 = x1
@@ -116,6 +119,9 @@ def analyze(frame):
     minLineLength = 100
     maxLineGap = 10
     lines = cv2.HoughLinesP(edgedImg, 1, pi/180, lineThreshold, minLineLength, maxLineGap)
+
+    if lines is None:
+        raise NoVanishingPointException
     
     #retFrame = cv2.cvtColor(edgedImg, cv2.COLOR_GRAY2BGR)
     retFrame = frame.copy()
@@ -127,7 +133,11 @@ def analyze(frame):
         if 0.1 < abs(lineObj.slope) < 10:
             diagLines.append(lineObj)
 
-    vanishPt, uniqueLines = findVanishingPt(diagLines, width, height)
+    try:
+        vanishPt, uniqueLines = findVanishingPt(diagLines, width, height)
+    except (ZeroDivisionError, IndexError):
+        raise NoVanishingPointException
+
     for line in uniqueLines:
         line.drawInf(retFrame)
     cv2.circle(retFrame, (int(round(vanishPt[0])), int(round(vanishPt[1]))), 5, RED, -1)

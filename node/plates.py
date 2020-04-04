@@ -129,7 +129,7 @@ def threshImg(grayImg, exposure = -2, kernel_size = 75):
     #kernel = np.ones((3,3), np.uint8) 
     #dilatedImg = cv2.dilate(threshedImg, kernel, iterations=1)
     #threshedImg = auto_canny(blurImg, sigma=0.1)
-    threshedImg = cv2.Canny(grayImg, 35, 70)
+    threshedImg = cv2.Canny(grayImg, 30, 60)
     return threshedImg
 
 def simplifyContour(contour, simplifyCoeff = POLY_APPROX_COEFF):
@@ -154,7 +154,7 @@ def getPlates(frame):
                 plate.contourArea / plate.boundingBoxArea >= RECT_MIN_BBOX_FILL
             )):
                 rects.append(plate)
-                print(plate.contourArea)
+                #print(plate.contourArea)
 
     return (
         sorted(rects, key=lambda rect: rect.contourArea), 

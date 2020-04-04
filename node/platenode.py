@@ -11,6 +11,8 @@ roslib.load_manifest('competition_2019t2')
 import rospy
 import cv2
 
+from sensor_msgs.msg import Image
+
 from cv_bridge import CvBridge, CvBridgeError
 
 from plates import getPlates, PlateRect
