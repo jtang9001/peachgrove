@@ -39,7 +39,7 @@ class image_converter:
     def __init__(self, conn):
         self.startTime = rospy.get_rostime()
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-        self.image_pub = rospy.Publisher("/annotated_image", Image, queue_size=1)
+        self.image_pub = rospy.Publisher("/annotated_image_vanishing_pt", Image, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback)
         self.integral = deque(maxlen=INTEGRAL_LENGTH)
