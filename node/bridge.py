@@ -46,18 +46,24 @@ class image_converter:
         self.odometer = 0
         self.lengths = 0
         self.heading = 0
+        self.lastTickTime = rospy.get_rostime()
+        self.frame = None
+        self.move = None
 
     def callback(self,data):
         try:
+            currentTime = rospy.get_rostime()
+            tickDuration = (currentTime - self.lastTickTime).to_sec()
+            self.lastTickTime = currentTime
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
             return
 
-        move = Twist()
+        self.move = Twist()
         try:
             xFrac, vanishPtFrame = analyze(cv_image)
-            frame = vanishPtFrame
+            self.frame = vanishPtFrame
 
             self.integral.append(xFrac)
             intTerm = sum(self.integral)
@@ -68,48 +74,56 @@ class image_converter:
             #     derivTerm = 0
 
             if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(20):# or pedestrians.hasPedestrian(cv_image):
-                move.linear.x = 0
-                move.angular.z = 0
+                self.move.linear.x = 0
+                self.move.angular.z = 0
+
+            elif self.lengths == 1 and 2.2 < self.odometer < 2.5 and self.heading > -6.6:
+                #rospy.loginfo("In turning override")
+                self.move.linear.x = 0.02
+                self.move.angular.z = -0.3
 
             else:
-                move.linear.x = getSpeedFromError(xFrac)
-                move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
+                self.move.linear.x = getSpeedFromError(xFrac)
+                self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
 
-            self.odometer += move.linear.x
-            self.heading += move.angular.z
+            self.odometer += self.move.linear.x * tickDuration
+            
             # pidStr = "P = %(error).2f, I = %(integral).2f, D = %(deriv).2f" % {"error": xFrac, "integral": intTerm, "deriv": derivTerm}
-            # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": move.angular.z, "vel": move.linear.x}
+            # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": self.move.angular.z, "vel": self.move.linear.x}
             # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
-            cv2.putText(frame, str(round(self.odometer, 2)) + "  " + str(round(self.heading, 2)), (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=2)
         
         except NoVanishingPointException:
-            self.integral.clear()
-            frame = cv_image
-            move.linear.x = 0.01
-            move.angular.z = -0.3
-            cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
-            if self.odometer > 40:
-                self.odometer = 0
-                self.lengths += 1
-                rospy.loginfo("Now on lap: ")
-                rospy.loginfo(self.lengths)
+            self.turnCorner()
+            self.frame = cv_image
 
         except Exception:
             rospy.logwarn(traceback.format_exc())
-            self.integral.clear()
-            frame = cv_image
-            move.linear.x = 0.01
-            move.angular.z = -0.3
-            cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
-            if self.odometer > 40:
-                self.odometer = 0
-                self.lengths += 1
-                rospy.loginfo("Now on lap: ")
-                rospy.loginfo(self.lengths)
+            self.turnCorner()
+            self.frame = cv_image
             
         finally:
-            self.pub.publish(move)
-            self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "bgr8"))
+            self.heading += self.move.angular.z * tickDuration
+            #self.heading = self.heading % 17.6
+            self.pub.publish(self.move)
+            odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.heading, "length": self.lengths}
+            cv2.putText(self.frame, odomStr, (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,0,0), thickness=2)
+            self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.frame, "bgr8"))
+
+    def turnCorner(self):
+        self.integral.clear()
+        if -6.4 > self.heading > -10.5:
+            rospy.loginfo("In special turn speed regime")
+            self.move.linear.x = 0.15
+        else:
+            self.move.linear.x = 0.01
+        self.move.angular.z = -0.35
+        #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
+        if self.odometer > 3.5:
+            self.odometer = 0
+            self.lengths += 1
+            rospy.loginfo("Now on length: ")
+            rospy.loginfo(self.lengths)
+                
         
 
 def main(args):
