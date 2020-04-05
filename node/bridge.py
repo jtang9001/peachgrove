@@ -23,7 +23,7 @@ from vanishpt import analyze, NoVanishingPointException
 from plates import getPlates, PlateRect
 #import pedestrians
 
-TURN_START = 2.5
+TURN_START = 3.1
 
 P_COEFF = -2
 I_COEFF = -0.02
@@ -88,14 +88,16 @@ class image_converter:
             # except Exception:
             #     derivTerm = 0
 
+            turn_start = 2.55 if self.lengths % 4 == 1 else 2.8
+
             if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(20):# or pedestrians.hasPedestrian(cv_image):
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
-            elif self.lengths % 2 == 1 and TURN_START < self.odometer < TURN_START + 0.4:# and self.localTurnHeading > -17.6:
+            elif self.lengths % 2 == 1 and turn_start < self.odometer < turn_start + 0.25:# and self.localTurnHeading > -17.6:
                 #rospy.loginfo("In turning override")
                 self.move.linear.x = 0.01
-                self.move.angular.z = -0.35
+                self.move.angular.z = -0.5
                 #self.localTurnHeading += self.move.angular.z * tickDuration
 
             else:
@@ -136,7 +138,7 @@ class image_converter:
         #     self.move.linear.x = 0.15
         # else:
         #     self.move.linear.x = 0.01
-        self.move.linear.x = 0.05
+        self.move.linear.x = 0.03
         self.move.angular.z = -0.35
         #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
         if self.odometer > 3.5:

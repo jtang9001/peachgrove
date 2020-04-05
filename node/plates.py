@@ -10,13 +10,15 @@ import pytesseract
 
 #pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+TESSERACT_OPTS = r'--oem 3 --psm 7'
+
 POLY_APPROX_COEFF = 0.03
 
-RECT_MIN_AR = 1 #min aspect ratio
+RECT_MIN_AR = 1.5 #min aspect ratio
 RECT_MAX_AR = 2.3 #max aspect ratio
-RECT_MIN_AREA = 250
+RECT_MIN_AREA = 400
 RECT_MAX_AREA = 10000
-RECT_MIN_BBOX_FILL = 0.3 #min pct that rect contour fills its minimal bounding box
+RECT_MIN_BBOX_FILL = 0.6 #min pct that rect contour fills its minimal bounding box
 
 def degToRad(degrees):
     return degrees * pi / 180
@@ -97,12 +99,16 @@ class PlateRect:
     def perspectiveTransform(self):
         persFrame = cv2.resize(four_point_transform(self.frame, self.contour.reshape(4,2)), (260,120))
         persFrame = persFrame[5:116, 5:256]
-        _, self.threshedPersFrame = cv2.threshold(persFrame,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        self.threshedPersFrame_rgb = persFrame
+        otsuVal, self.threshedPersFrame = cv2.threshold(persFrame,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        _, self.threshedPersFrame = cv2.threshold(persFrame, otsuVal * 0.8, 255, cv2.THRESH_BINARY)
         return self.threshedPersFrame
 
     def ocrFrame(self):
         self.threshedPersFrame_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
-        self.ocrStr = pytesseract.image_to_string(self.threshedPersFrame_rgb).encode("ascii", "ignore")
+        self.ocrStr = pytesseract.image_to_string(
+            self.threshedPersFrame_rgb, config = TESSERACT_OPTS
+        ).encode("ascii", "ignore")
         return self.ocrStr
 
     def labelOnFrame(self, frame):
@@ -162,6 +168,7 @@ def getPlates(frame):
     for contour in contours:
         approxCnt = simplifyContour(contour)
         if len(approxCnt) == 4:
+            #plate = PlateRect(approxCnt, greyFrame)
             plate = PlateRect(approxCnt, greyFrame)
             if all((
                 RECT_MIN_AREA <= plate.contourArea <= RECT_MAX_AREA,

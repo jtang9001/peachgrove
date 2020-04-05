@@ -26,9 +26,10 @@ class PlateReader:
 
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback, buff_size=2**26)
+        self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback, buff_size=2**26, queue_size=2)
         self.image_pub = rospy.Publisher("/annotated_image_plates", Image, queue_size=1)
         self.framenum = 0
+        self.lastGoodFrame = 0
 
     def callback(self,data):
         try:
@@ -43,6 +44,12 @@ class PlateReader:
             stackedPlates = None
             if len(rects) != 0:
                 rospy.loginfo("Frame " + str(self.framenum))
+                if self.framenum - self.lastGoodFrame == 1:
+                    #skip every other frame?
+                    raise NoLicensePlatesException
+
+                self.lastGoodFrame = self.framenum
+
             for rect in rects:
                 rect.perspectiveTransform()
                 rospy.loginfo(rect.ocrFrame())
