@@ -30,7 +30,7 @@ I_COEFF = -0.02
 D_COEFF = 0
 INTEGRAL_LENGTH = 50
 MINSPEED = 0.02
-MAXSPEED = 0.2
+MAXSPEED = 0.3
 def getSpeedFromError(error):
     if error < 0:
         error *= -1
