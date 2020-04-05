@@ -68,8 +68,15 @@ class image_converter:
             xFrac, vanishPtFrame = analyze(cv_image)
 
             rects, threshedFrame = getPlates(cv_image)
+            for rect in rects:
+                rect.labelOnFrame(vanishPtFrame)
 
-            cv2.drawContours(vanishPtFrame, [rect.contour for rect in rects], -1, (255,255,0), 2)
+            cv2.putText(
+                vanishPtFrame, "Rects:" + str(len(rects)), (20,90), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,0,0), thickness=2
+            )
+
+            #cv2.drawContours(vanishPtFrame, [rect.contour for rect in rects], -1, (255,255,0), 2)
 
             self.frame = vanishPtFrame
 
@@ -116,7 +123,10 @@ class image_converter:
             #self.heading = self.heading % 17.6
             self.pub.publish(self.move)
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
-            cv2.putText(self.frame, odomStr, (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,0,0), thickness=2)
+            cv2.putText(
+                self.frame, odomStr, (20,50), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,0,0), thickness=2
+            )
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.frame, "bgr8"))
 
     def turnCorner(self):

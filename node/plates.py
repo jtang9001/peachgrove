@@ -13,10 +13,10 @@ import pytesseract
 POLY_APPROX_COEFF = 0.03
 
 RECT_MIN_AR = 1 #min aspect ratio
-RECT_MAX_AR = 2.5 #max aspect ratio
-RECT_MIN_AREA = 500
+RECT_MAX_AR = 2.3 #max aspect ratio
+RECT_MIN_AREA = 250
 RECT_MAX_AREA = 10000
-RECT_MIN_BBOX_FILL = 0.1 #min pct that rect contour fills its minimal bounding box
+RECT_MIN_BBOX_FILL = 0.3 #min pct that rect contour fills its minimal bounding box
 
 def degToRad(degrees):
     return degrees * pi / 180
@@ -101,9 +101,18 @@ class PlateRect:
         return self.threshedPersFrame
 
     def ocrFrame(self):
-        img_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
-        self.ocrStr = pytesseract.image_to_string(img_rgb).encode("ascii", "ignore")
+        self.threshedPersFrame_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
+        self.ocrStr = pytesseract.image_to_string(self.threshedPersFrame_rgb).encode("ascii", "ignore")
         return self.ocrStr
+
+    def labelOnFrame(self, frame):
+        centerRounded = (int(self.center[0]), int(self.center[1]))
+        cv2.drawContours(frame, [self.contour], -1, (255,255,0), 2)
+        # if hasattr(self, "ocrStr"):
+        #     cv2.putText(frame, self.ocrStr, self.center, cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
+        posnStr = "%(x)d, %(y)d, %(area)d" % {"x": self.center[0], "y": self.center[1], "area": self.contourArea}
+        cv2.putText(frame, posnStr, centerRounded, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,0,0), thickness=2)
+
 
 def auto_canny(image, sigma=.8):
 	# compute the median of the single channel pixel intensities
@@ -137,6 +146,12 @@ def simplifyContour(contour, simplifyCoeff = POLY_APPROX_COEFF):
     approxCnt = cv2.approxPolyDP(contour, simplifyCoeff*perimeter, True)
     return approxCnt
 
+def approxEqual(a, b, tol = 0.05):
+    if b * (1-tol) <= a <= b * (1+tol):
+        return True
+    else:
+        return False
+
 def getPlates(frame):
     greyFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     threshedImg = threshImg(greyFrame)
@@ -156,7 +171,58 @@ def getPlates(frame):
                 rects.append(plate)
                 #print(plate.contourArea)
 
+    goodPlates = set()
+    platesToRemove = set()
+
+    for i in range(len(rects)):
+        for j in range(i+1, len(rects)):
+            rectA = rects[i]
+            rectB = rects[j]
+            if (
+                approxEqual(rectA.center[0], rectB.center[0])
+                and approxEqual(rectA.center[1], rectB.center[1])
+            ):
+                largestRect = rectA if rectA.contourArea > rectB.contourArea else rectB
+                platesToRemove.add(largestRect)
+
+    rects = list(set(rects) - platesToRemove)
+
+    for i in range(len(rects)):
+        for j in range(i+1, len(rects)):
+            rectA = rects[i]
+            rectB = rects[j]
+            if (
+                approxEqual(rectA.center[0], rectB.center[0])
+                and not approxEqual(rectA.center[1], rectB.center[1])
+            ):
+                goodPlates.add(rectA)
+                goodPlates.add(rectB)
+
+    
+
+    # plateGroupings = {}
+    # for plate in rects:
+    #     addToPlate = None
+    #     platesOverlap = False
+    #     for keyPlate, similarPlates in plateGroupings.items():
+    #         if approxEqual(keyPlate.center[0], plate.center[0]):
+    #             if approxEqual(keyPlate.center[1], plate.center[1]):
+    #                 platesOverlap = True
+    #             else:
+    #                 addToPlate = keyPlate
+        
+    #     if addToPlate is not None:
+    #         plateGroupings[keyPlate].append(plate)
+    #     elif not platesOverlap:
+    #         plateGroupings[plate] = []
+
+    # goodPlates = []
+    # for keyPlate, similarPlates in plateGroupings.items():
+    #     if len(similarPlates) == 1:
+    #         goodPlates.append(keyPlate)
+    #         goodPlates.append(similarPlates[0]) 
+
     return (
-        sorted(rects, key=lambda rect: rect.contourArea), 
+        sorted(list(goodPlates), key=lambda rect: rect.contourArea), 
         cv2.cvtColor(threshedImg, cv2.COLOR_GRAY2BGR)
     )
