@@ -14,11 +14,11 @@ TESSERACT_OPTS = r'--oem 3 --psm 7'
 
 POLY_APPROX_COEFF = 0.03
 
-RECT_MIN_AR = 1.5 #min aspect ratio
+RECT_MIN_AR = 1.2 #min aspect ratio
 RECT_MAX_AR = 2.3 #max aspect ratio
 RECT_MIN_AREA = 400
 RECT_MAX_AREA = 10000
-RECT_MIN_BBOX_FILL = 0.6 #min pct that rect contour fills its minimal bounding box
+RECT_MIN_BBOX_FILL = 0.4 #min pct that rect contour fills its minimal bounding box
 
 def degToRad(degrees):
     return degrees * pi / 180
@@ -102,14 +102,21 @@ class PlateRect:
         self.threshedPersFrame_rgb = persFrame
         otsuVal, self.threshedPersFrame = cv2.threshold(persFrame,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         _, self.threshedPersFrame = cv2.threshold(persFrame, otsuVal * 0.8, 255, cv2.THRESH_BINARY)
+        self.threshedPersFrame = cv2.copyMakeBorder(self.threshedPersFrame, 5,5,5,5, cv2.BORDER_CONSTANT, value=255)
         return self.threshedPersFrame
 
     def ocrFrame(self):
         self.threshedPersFrame_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
-        self.ocrStr = pytesseract.image_to_string(
-            self.threshedPersFrame_rgb, config = TESSERACT_OPTS
-        ).encode("ascii", "ignore")
-        return self.ocrStr
+        # self.ocrStr = pytesseract.image_to_string(
+        #     self.threshedPersFrame_rgb, config = TESSERACT_OPTS
+        # ).encode("ascii", "ignore")
+        ocrDict = pytesseract.image_to_data(
+            self.threshedPersFrame_rgb, config=TESSERACT_OPTS, 
+            output_type=pytesseract.Output.DICT
+        )
+        self.ocrStr = ''.join(ocrDict[u"text"]).encode("ascii", "ignore")
+        self.ocrConf = np.mean([x for x in ocrDict[u"conf"] if int(x) > 0])
+        return self.ocrStr, self.ocrConf
 
     def labelOnFrame(self, frame):
         centerRounded = (int(self.center[0]), int(self.center[1]))
@@ -168,7 +175,6 @@ def getPlates(frame):
     for contour in contours:
         approxCnt = simplifyContour(contour)
         if len(approxCnt) == 4:
-            #plate = PlateRect(approxCnt, greyFrame)
             plate = PlateRect(approxCnt, greyFrame)
             if all((
                 RECT_MIN_AREA <= plate.contourArea <= RECT_MAX_AREA,
@@ -202,34 +208,9 @@ def getPlates(frame):
                 approxEqual(rectA.center[0], rectB.center[0])
                 and not approxEqual(rectA.center[1], rectB.center[1])
             ):
-                goodPlates.add(rectA)
-                goodPlates.add(rectB)
-
-    
-
-    # plateGroupings = {}
-    # for plate in rects:
-    #     addToPlate = None
-    #     platesOverlap = False
-    #     for keyPlate, similarPlates in plateGroupings.items():
-    #         if approxEqual(keyPlate.center[0], plate.center[0]):
-    #             if approxEqual(keyPlate.center[1], plate.center[1]):
-    #                 platesOverlap = True
-    #             else:
-    #                 addToPlate = keyPlate
-        
-    #     if addToPlate is not None:
-    #         plateGroupings[keyPlate].append(plate)
-    #     elif not platesOverlap:
-    #         plateGroupings[plate] = []
-
-    # goodPlates = []
-    # for keyPlate, similarPlates in plateGroupings.items():
-    #     if len(similarPlates) == 1:
-    #         goodPlates.append(keyPlate)
-    #         goodPlates.append(similarPlates[0]) 
+                goodPlates.add(frozenset([rectA, rectB]))
 
     return (
-        sorted(list(goodPlates), key=lambda rect: rect.contourArea), 
+        goodPlates,
         cv2.cvtColor(threshedImg, cv2.COLOR_GRAY2BGR)
     )

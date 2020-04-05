@@ -54,6 +54,7 @@ class image_converter:
         self.localTurnHeading = 0
 
     def callback(self,data):
+
         try:
             currentTime = rospy.get_rostime()
             tickDuration = (currentTime - self.lastTickTime).to_sec()
@@ -67,12 +68,13 @@ class image_converter:
         try:
             xFrac, vanishPtFrame = analyze(cv_image)
 
-            rects, threshedFrame = getPlates(cv_image)
-            for rect in rects:
-                rect.labelOnFrame(vanishPtFrame)
+            rectPairs, threshedFrame = getPlates(cv_image)
+            for rectPair in rectPairs:
+                for rect in rectPair:
+                    rect.labelOnFrame(vanishPtFrame)
 
             cv2.putText(
-                vanishPtFrame, "Rects:" + str(len(rects)), (20,90), 
+                vanishPtFrame, "Pairs:" + str(len(rectPairs)), (20,90), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,0,0), thickness=2
             )
 
@@ -88,20 +90,21 @@ class image_converter:
             # except Exception:
             #     derivTerm = 0
 
-            turn_start = 2.55 if self.lengths % 4 == 1 else 2.8
+            turn_start = 2.5 if self.lengths % 4 == 1 else 2.5
+            turn_minimum_radians = -13 if self.lengths % 4 == 1 else -14
 
             if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(20):# or pedestrians.hasPedestrian(cv_image):
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
-            elif self.lengths % 2 == 1 and turn_start < self.odometer < turn_start + 0.25:# and self.localTurnHeading > -17.6:
+            elif self.lengths % 2 == 1 and self.localTurnHeading > turn_minimum_radians and turn_start < self.odometer < turn_start + 0.25:
                 #rospy.loginfo("In turning override")
                 self.move.linear.x = 0.01
                 self.move.angular.z = -0.5
-                #self.localTurnHeading += self.move.angular.z * tickDuration
+                self.localTurnHeading += self.move.angular.z * tickDuration
 
             else:
-                #self.localTurnHeading = 0
+                self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
                 self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
 
@@ -112,7 +115,12 @@ class image_converter:
             # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
         
         except NoVanishingPointException:
-            self.turnCorner()
+            if self.localTurnHeading != 0:
+                self.move.linear.x = 0.01
+                self.move.angular.z = -0.5
+                self.localTurnHeading += self.move.angular.z * tickDuration
+            else:
+                self.turnCorner()
             self.frame = cv_image
 
         except Exception:
@@ -133,12 +141,7 @@ class image_converter:
 
     def turnCorner(self):
         self.integral.clear()
-        # if -6.4 > self.heading > -10.5:
-        #     rospy.loginfo("In special turn speed regime")
-        #     self.move.linear.x = 0.15
-        # else:
-        #     self.move.linear.x = 0.01
-        self.move.linear.x = 0.03
+        self.move.linear.x = 0.06
         self.move.angular.z = -0.35
         #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
         if self.odometer > 3.5:
