@@ -4,7 +4,7 @@ import numpy as np
 
 def hasPedestrian(frame):
     
-    #TODO: taking an bGR OpenCV frame as input, return if there 
+    #TODO: taking an bGR OpenCV frame as input, return true if there 
     # is a pedestrian in the frame (ie. should the car stop)
     
     # what do the pedestrians look like in the simulation: 
@@ -12,27 +12,55 @@ def hasPedestrian(frame):
     # Different softwares use different scales. 
     # If you are comparing OpenCV values with them, you need to normalize these ranges.
     
+    #define some constants
+    brownThresh = 0
+    
     #Convert from BGR to HSV color-space
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # define range of blue color in HSV
+    #TODO: change to range of brown of pedestrian 
     lower_blue = np.array([110,50,50])
     upper_blue = np.array([130,255,255])
 
     # Threshold the HSV image for a range of blue color (to get only blue colors)
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
 
-    # Bitwise-AND mask and original image
+    # Bitwise_AND on mask and original frame
+    # In openCV, the value of the colour black is 0, so black + anycolour = anycolour
+    # This will assign any pixels in our colour range a value 1 and everything else 0 (black)
     res = cv2.bitwise_and(frame,frame, mask= mask)
     
-    #next step is to count pixels of our desired shade
+    #count how many pixels in our range of brown
+    #totalBrownpixels = cv.countNonZero(res)
+    
+    #find CM location of pedestrian (within frame)
+    width = res.shape()[1]
+    height = res.shape()[0]
+    
+    i_accumulator = 0
+    i_count = 0
+    for i in range(0,width) :
+        for j in range(0,height) :
+            if res[i,j] = 255 :
+                i_accumulated += i
+                i_count += 1
+    
+    pedestrian_CM = i_accumulated/i_count
+    
+    if pedestrian_CM in range(10,width-10) :
+        return True
+    return False
+    
+    #keep track of previous (20?) frames to track movement
+    #use deque => if full (keep track of size), remove at one end before adding to top
+    # monitor where white is in sea of black
+    # crosses, stops, crosses bakc, stops
 
     #cv2.imshow('frame',frame)
     #cv2.imshow('mask',mask)
     #cv2.imshow('res',res)
-        
-    return false
-    
+   
 #from lab 2
     binFrame = grayscaleThresh(getBottomPixels(hsvFrame, 100), 50)
     blurFrame = cv2.blur(binFrame, (5,5))
