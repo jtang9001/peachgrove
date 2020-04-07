@@ -24,15 +24,16 @@ class NoLicensePlatesException(Exception):
 
 class PlateStorage:
     def __init__(self):
-        self.plates = [[defaultdict(int) for i in range(4)] for j in range(6)]
+        self.plates = [[defaultdict(int) for i in range(4)] for j in range(16)]
     
     def addPlate(self, plateNum, plateStr, conf = 75):
         for i in range(4):
             self.plates[plateNum - 1][i][plateStr[i]] += conf
 
     def renderPlates(self):
-        plateStrs = []
-        for charFreqList in self.plates:
+        plateStrs = {}
+        for i in range(len(self.plates)):
+            charFreqList = self.plates[i]
             plateStr = ''
             for charFreqDict in charFreqList:
                 try:
@@ -40,8 +41,9 @@ class PlateStorage:
                     plateStr += mostFreqChar
                 except ValueError:
                     pass
-            plateStrs.append(plateStr)
-        return enumerate(plateStrs, start=1)
+            if len(plateStr) != 0:
+                plateStrs[i+1] = plateStr
+        return plateStrs
 
 def getAlnumChars(s):
     return ''.join((char for char in s if char.isalnum()))
@@ -49,18 +51,30 @@ def getAlnumChars(s):
 CHAR_CONF_CHART = {
     "1": ["I", "i", "l"],
     "2": ["Z", "z"],
+    "3": ["J"],
     "5": ["S", "s"],
     "6": ["G"],
-    "0": ["O", "o"]
+    "0": ["O", "o", "e"]
 }
 
 def getNumFromAlpha(alphaChar):
     for key, value in CHAR_CONF_CHART.iteritems():
         if alphaChar in value:
             return key
+        else:
+            return alphaChar
     
 def getAlphaFromNum(numChar):
-    return CHAR_CONF_CHART[numChar][0]
+    if numChar in CHAR_CONF_CHART:
+        return CHAR_CONF_CHART[numChar][0]
+    else:
+        return numChar
+
+def convertStrToInt(s):
+    return int("".join(getNumFromAlpha(x) for x in s))
+
+def convertIntToStr(s):
+    return "".join(getAlphaFromNum(x) for x in s)
 
 
 class PlateReader:
@@ -86,12 +100,12 @@ class PlateReader:
             self.framenum += 1
             if len(rectPairs) != 0:
                 rospy.loginfo("Frame " + str(self.framenum))
-                if self.framenum - self.lastGoodFrame == 1:
-                    #skip every other frame?
-                    raise NoLicensePlatesException
+                # if self.framenum - self.lastGoodFrame == 1:
+                #     #skip every other frame?
+                #     raise NoLicensePlatesException
 
-                self.lastGoodFrame = self.framenum
-                rospy.loginfo(list(self.plateStorage.renderPlates()))
+                # self.lastGoodFrame = self.framenum
+                rospy.loginfo(self.plateStorage.renderPlates())
                 #rospy.loginfo(self.plateStorage.plates)
 
             stackedPlates = None
@@ -104,21 +118,13 @@ class PlateReader:
                     rectAlnum = getAlnumChars(rectStr)
                     rospy.loginfo(rectAlnum + " / conf: " + str(conf))
 
-                    if len(rectAlnum) == 2:
-                        if rectAlnum[1].isdigit():
-                            spotNum = int(rectAlnum[1])
-                        else:
-                            spotNum = int(getNumFromAlpha(rectAlnum[1]))
+                    if len(rectAlnum) == 3:
+                        spotNum = convertStrToInt(rectAlnum[1:])
 
                     elif len(rectAlnum) == 4:
-                        rectAlnum = list(rectAlnum.upper())
-                        for i in range(2):
-                            if rectAlnum[i].isdigit():
-                                rectAlnum[i] = getAlphaFromNum(rectAlnum[i])
-                        for i in range(2, 4):
-                            if rectAlnum[i].isalpha():
-                                rectAlnum[i] = getNumFromAlpha(rectAlnum[i])
-                        plateStr = ''.join(rectAlnum)
+                        plateLetters = convertIntToStr(rectAlnum[:2])
+                        plateNumbers = convertStrToInt(rectAlnum[2:])
+                        plateStr = plateLetters + str(plateNumbers)
 
                     if stackedPlates is None:
                         stackedPlates = rect.threshedPersFrame_rgb

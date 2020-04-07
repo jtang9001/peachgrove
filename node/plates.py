@@ -98,7 +98,7 @@ class PlateRect:
 
     def perspectiveTransform(self):
         persFrame = cv2.resize(four_point_transform(self.frame, self.contour.reshape(4,2)), (260,120))
-        persFrame = persFrame[5:116, 5:256]
+        persFrame = persFrame[10:111, 10:251]
         self.threshedPersFrame_rgb = persFrame
         otsuVal, self.threshedPersFrame = cv2.threshold(persFrame,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         _, self.threshedPersFrame = cv2.threshold(persFrame, otsuVal * 0.8, 255, cv2.THRESH_BINARY)

@@ -23,14 +23,13 @@ from vanishpt import analyze, NoVanishingPointException
 from plates import getPlates, PlateRect
 #import pedestrians
 
-TURN_START = 3.1
 
-P_COEFF = -2
-I_COEFF = -0.02
+P_COEFF = -2.2
+I_COEFF = -0.015
 D_COEFF = 0
 INTEGRAL_LENGTH = 50
 MINSPEED = 0.02
-MAXSPEED = 0.3
+MAXSPEED = 0.4
 def getSpeedFromError(error):
     if error < 0:
         error *= -1
@@ -91,9 +90,9 @@ class image_converter:
             #     derivTerm = 0
 
             turn_start = 2.5 if self.lengths % 4 == 1 else 2.5
-            turn_minimum_radians = -13 if self.lengths % 4 == 1 else -14
+            turn_minimum_radians = -14 if self.lengths % 4 == 1 else -14
 
-            if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(20):# or pedestrians.hasPedestrian(cv_image):
+            if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(10):# or pedestrians.hasPedestrian(cv_image):
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
