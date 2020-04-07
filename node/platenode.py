@@ -5,6 +5,7 @@ from __future__ import division
 import sys
 from collections import deque, defaultdict
 import traceback
+from string import maketrans
 
 import numpy as np
 
@@ -25,14 +26,23 @@ class NoLicensePlatesException(Exception):
 class PlateStorage:
     def __init__(self):
         self.plates = [[defaultdict(int) for i in range(4)] for j in range(16)]
+        self.plateNumConf = {i: 0 for i in range(16)}
     
-    def addPlate(self, plateNum, plateStr, conf = 75):
+    def addPlate(self, plateNum, plateStr, numConf = 75, strConf = 75):
         for i in range(4):
-            self.plates[plateNum - 1][i][plateStr[i]] += conf
+            self.plates[plateNum - 1][i][plateStr[i]] += strConf
+            self.plateNumConf[plateNum - 1] += numConf
 
     def renderPlates(self):
         plateStrs = {}
-        for i in range(len(self.plates)):
+        usedPlateStrs = set()
+        highestConfSpots = sorted(
+            self.plateNumConf.iterkeys(), 
+            key=lambda k: self.plateNumConf[k],
+            reverse=True
+        )
+
+        for i in highestConfSpots:
             charFreqList = self.plates[i]
             plateStr = ''
             for charFreqDict in charFreqList:
@@ -41,40 +51,25 @@ class PlateStorage:
                     plateStr += mostFreqChar
                 except ValueError:
                     pass
-            if len(plateStr) != 0:
+            if len(plateStr) != 0 and plateStr not in usedPlateStrs:
+                usedPlateStrs.add(plateStr)
                 plateStrs[i+1] = plateStr
+            if len(usedPlateStrs) >= 6:
+                break
         return plateStrs
 
 def getAlnumChars(s):
-    return ''.join((char for char in s if char.isalnum()))
+    return ''.join(char for char in s if char.isalnum())
 
-CHAR_CONF_CHART = {
-    "1": ["I", "i", "l"],
-    "2": ["Z", "z"],
-    "3": ["J"],
-    "5": ["S", "s"],
-    "6": ["G"],
-    "0": ["O", "o", "e"]
-}
 
-def getNumFromAlpha(alphaChar):
-    for key, value in CHAR_CONF_CHART.iteritems():
-        if alphaChar in value:
-            return key
-        else:
-            return alphaChar
-    
-def getAlphaFromNum(numChar):
-    if numChar in CHAR_CONF_CHART:
-        return CHAR_CONF_CHART[numChar][0]
-    else:
-        return numChar
+aFromCands = "IilZzJSsGBOoe"
+numToCands = "1112235568000"
 
-def convertStrToInt(s):
-    return int("".join(getNumFromAlpha(x) for x in s))
+numFromCands = "12356780"
+alphaToCands = "IZJSGZBO"
 
-def convertIntToStr(s):
-    return "".join(getAlphaFromNum(x) for x in s)
+NUM_TO_ALPHA = maketrans(numFromCands, alphaToCands)
+ALPHA_TO_NUM = maketrans(aFromCands, numToCands)
 
 
 class PlateReader:
@@ -116,15 +111,17 @@ class PlateReader:
                     rect.perspectiveTransform()
                     rectStr, conf = rect.ocrFrame()
                     rectAlnum = getAlnumChars(rectStr)
-                    rospy.loginfo(rectAlnum + " / conf: " + str(conf))
+                    #rospy.loginfo(rectAlnum + " - conf: " + str(conf))
 
                     if len(rectAlnum) == 3:
-                        spotNum = convertStrToInt(rectAlnum[1:])
+                        spotNum = int(rectAlnum[1:].translate(ALPHA_TO_NUM))
+                        spotConf = conf
 
                     elif len(rectAlnum) == 4:
-                        plateLetters = convertIntToStr(rectAlnum[:2])
-                        plateNumbers = convertStrToInt(rectAlnum[2:])
-                        plateStr = plateLetters + str(plateNumbers)
+                        plateLetters = rectAlnum[:2].translate(NUM_TO_ALPHA)
+                        plateNumbers = rectAlnum[2:].translate(ALPHA_TO_NUM)
+                        plateStr = (plateLetters + plateNumbers).upper()
+                        plateConf = conf
 
                     if stackedPlates is None:
                         stackedPlates = rect.threshedPersFrame_rgb
@@ -132,7 +129,10 @@ class PlateReader:
                         stackedPlates = np.vstack([stackedPlates, rect.threshedPersFrame_rgb])
 
                 if plateStr is not None and spotNum is not None:
-                    self.plateStorage.addPlate(spotNum, plateStr, conf)
+                    rospy.loginfo(
+                        "%s - %s, spot conf = %.2f, plate conf = %.2f" % (spotNum, plateStr, spotConf, plateConf)
+                    )
+                    self.plateStorage.addPlate(spotNum, plateStr, spotConf, plateConf)
                 
             if stackedPlates is not None:
                 self.stackedPlates = stackedPlates

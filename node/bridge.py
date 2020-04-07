@@ -24,10 +24,10 @@ from plates import getPlates, PlateRect
 #import pedestrians
 
 
-P_COEFF = -2.2
-I_COEFF = -0.015
+P_COEFF = -4
+I_COEFF = -0.01
 D_COEFF = 0
-INTEGRAL_LENGTH = 50
+INTEGRAL_LENGTH = 40
 MINSPEED = 0.02
 MAXSPEED = 0.4
 def getSpeedFromError(error):
@@ -48,16 +48,19 @@ class image_converter:
         self.lengths = 0
         self.heading = 0
         self.lastTickTime = rospy.get_rostime()
+        self.tickDuration = 0
         self.frame = None
-        self.move = None
+        self.move = Twist()
         self.localTurnHeading = 0
 
     def callback(self,data):
 
         try:
             currentTime = rospy.get_rostime()
-            tickDuration = (currentTime - self.lastTickTime).to_sec()
+            self.tickDuration = (currentTime - self.lastTickTime).to_sec()
             self.lastTickTime = currentTime
+            self.odometer += self.move.linear.x * self.tickDuration
+            self.heading += self.move.angular.z * self.tickDuration
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
@@ -89,35 +92,29 @@ class image_converter:
             # except Exception:
             #     derivTerm = 0
 
-            turn_start = 2.5 if self.lengths % 4 == 1 else 2.5
-            turn_minimum_radians = -14 if self.lengths % 4 == 1 else -14
+            turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
+            turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
             if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(10):# or pedestrians.hasPedestrian(cv_image):
                 self.move.linear.x = 0
-                self.move.angular.z = 0
+                self.move.angular.z = 0.08
 
             elif self.lengths % 2 == 1 and self.localTurnHeading > turn_minimum_radians and turn_start < self.odometer < turn_start + 0.25:
                 #rospy.loginfo("In turning override")
-                self.move.linear.x = 0.01
-                self.move.angular.z = -0.5
-                self.localTurnHeading += self.move.angular.z * tickDuration
+                self.twirl()
 
             else:
                 self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
                 self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
 
-            self.odometer += self.move.linear.x * tickDuration
-            
             # pidStr = "P = %(error).2f, I = %(integral).2f, D = %(deriv).2f" % {"error": xFrac, "integral": intTerm, "deriv": derivTerm}
             # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": self.move.angular.z, "vel": self.move.linear.x}
             # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
         
         except NoVanishingPointException:
             if self.localTurnHeading != 0:
-                self.move.linear.x = 0.01
-                self.move.angular.z = -0.5
-                self.localTurnHeading += self.move.angular.z * tickDuration
+                self.twirl()
             else:
                 self.turnCorner()
             self.frame = cv_image
@@ -128,7 +125,6 @@ class image_converter:
             self.frame = cv_image
             
         finally:
-            self.heading += self.move.angular.z * tickDuration
             #self.heading = self.heading % 17.6
             self.pub.publish(self.move)
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
@@ -140,14 +136,20 @@ class image_converter:
 
     def turnCorner(self):
         self.integral.clear()
-        self.move.linear.x = 0.06
-        self.move.angular.z = -0.35
+        self.move.linear.x = 0.05
+        self.move.angular.z = -0.5
         #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
         if self.odometer > 3.5:
             self.odometer = 0
             self.lengths += 1
             rospy.loginfo("Now on length: ")
             rospy.loginfo(self.lengths)
+            
+    def twirl(self, ang_vel = -0.6):
+        self.integral.clear()
+        self.move.linear.x = 0.01
+        self.move.angular.z = ang_vel
+        self.localTurnHeading += self.move.angular.z * self.tickDuration
                 
         
 

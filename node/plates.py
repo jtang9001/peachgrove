@@ -1,5 +1,5 @@
 import cv2
-from math import pi
+from math import pi, log
 import numpy as np
 
 try:
@@ -115,7 +115,7 @@ class PlateRect:
             output_type=pytesseract.Output.DICT
         )
         self.ocrStr = ''.join(ocrDict[u"text"]).encode("ascii", "ignore")
-        self.ocrConf = np.mean([x for x in ocrDict[u"conf"] if int(x) > 0])
+        self.ocrConf = np.mean([x for x in ocrDict[u"conf"] if int(x) > 0]) * log(self.contourArea, 10)
         return self.ocrStr, self.ocrConf
 
     def labelOnFrame(self, frame):
