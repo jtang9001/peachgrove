@@ -39,6 +39,9 @@ class image_converter:
 
     def __init__(self):
         self.startTime = rospy.get_rostime()
+
+        rospy.sleep(5.)
+
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image_vanishing_pt", Image, queue_size=1)
         self.bridge = CvBridge()
@@ -95,9 +98,10 @@ class image_converter:
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
-            if rospy.get_rostime() - self.startTime < rospy.Duration.from_sec(10):# or pedestrians.hasPedestrian(cv_image):
+            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):# or pedestrians.hasPedestrian(cv_image):
+                rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
-                self.move.angular.z = 0.08
+                self.move.angular.z = 0
 
             elif self.lengths % 2 == 1 and self.localTurnHeading > turn_minimum_radians and turn_start < self.odometer < turn_start + 0.25:
                 #rospy.loginfo("In turning override")

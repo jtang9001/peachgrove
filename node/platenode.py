@@ -75,6 +75,7 @@ ALPHA_TO_NUM = maketrans(aFromCands, numToCands)
 class PlateReader:
 
     def __init__(self):
+        self.startTime = rospy.get_rostime()
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback, buff_size=2**26, queue_size=3)
         self.image_pub = rospy.Publisher("/annotated_image_plates", Image, queue_size=1)
@@ -85,6 +86,9 @@ class PlateReader:
 
     def callback(self,data):
         try:
+            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):
+                raise NoLicensePlatesException
+
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
 
             rectPairs, threshedFrame = getPlates(cv_image)
@@ -144,7 +148,6 @@ class PlateReader:
             rospy.logwarn(traceback.format_exc())
             
         finally:
-            
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.stackedPlates, "bgr8"))
         
 
