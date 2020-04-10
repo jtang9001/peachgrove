@@ -42,7 +42,7 @@ def hasPedestrian(frame):
     i_count = 0
     for i in range(0,width) :
         for j in range(0,height) :
-            if res[i,j] = 255 :
+            if res[i][j] == 255 :
                 i_accumulated += i
                 i_count += 1
     
@@ -61,48 +61,48 @@ def hasPedestrian(frame):
     #cv2.imshow('mask',mask)
     #cv2.imshow('res',res)
    
-#from lab 2
-    binFrame = grayscaleThresh(getBottomPixels(hsvFrame, 100), 50)
-    blurFrame = cv2.blur(binFrame, (5,5))
+# #from lab 2
+#     binFrame = grayscaleThresh(getBottomPixels(hsvFrame, 100), 50)
+#     blurFrame = cv2.blur(binFrame, (5,5))
 
-    contours = getContours(blurFrame)
-    if len(contours) > 0:
-        largestContour = max(contours, key = lambda contour: cv2.contourArea(contour))
-    else:
-        continue
+#     contours = getContours(blurFrame)
+#     if len(contours) > 0:
+#         largestContour = max(contours, key = lambda contour: cv2.contourArea(contour))
+#     else:
+#         continue
 
-    dispFrame = cv2.cvtColor(blurFrame, cv2.COLOR_GRAY2BGR)
-    cv2.drawContours(dispFrame, [largestContour], -1, (0,255,0), 3)
-    drawCircle(frame, getCenter(largestContour, yOffset=frame.shape[0] - 100), 20)
+#     dispFrame = cv2.cvtColor(blurFrame, cv2.COLOR_GRAY2BGR)
+#     cv2.drawContours(dispFrame, [largestContour], -1, (0,255,0), 3)
+#     drawCircle(frame, getCenter(largestContour, yOffset=frame.shape[0] - 100), 20)
 
-    cv2.imshow("Original frame", frame)
-    cv2.imshow("Contour frame", dispFrame)
+#     cv2.imshow("Original frame", frame)
+#     cv2.imshow("Contour frame", dispFrame)
     
-#some functions from lab 2
-def hsvThresh(frame):
-    hsvFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    satFrame = hsvFrame[:, :, 1]
-    satBGRFrame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    return satFrame
+# #some functions from lab 2
+# def hsvThresh(frame):
+#     hsvFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+#     satFrame = hsvFrame[:, :, 1]
+#     satBGRFrame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+#     return satFrame
 
-def getBottomPixels(frame, nPixels = 100):
-    yCoords = frame.shape[0]
-    return frame[yCoords - nPixels:yCoords, :]
+# def getBottomPixels(frame, nPixels = 100):
+#     yCoords = frame.shape[0]
+#     return frame[yCoords - nPixels:yCoords, :]
 
-# "binarizes" the frame. Only 0 or 255 are left possible.
-def grayscaleThresh(frame, threshold = 50):
-    _, threshedFrame = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
-    return threshedFrame
+# # "binarizes" the frame. Only 0 or 255 are left possible.
+# def grayscaleThresh(frame, threshold = 50):
+#     _, threshedFrame = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
+#     return threshedFrame
 
-# findContours requires binary frame
-def getContours(frame):
-    return cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
+# # findContours requires binary frame
+# def getContours(frame):
+#     return cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
 
-def getCenter(contour, yOffset = 0):
-    moments = cv2.moments(contour)
-    cX = int(moments["m10"] / moments["m00"])
-    cY = int(moments["m01"] / moments["m00"])
-    return (cX, cY + yOffset)
+# def getCenter(contour, yOffset = 0):
+#     moments = cv2.moments(contour)
+#     cX = int(moments["m10"] / moments["m00"])
+#     cY = int(moments["m01"] / moments["m00"])
+#     return (cX, cY + yOffset)
 
-def drawCircle(frame, center, radius = 5):
-    cv2.circle(frame, center, radius, (0,0,255), thickness=-1)
+# def drawCircle(frame, center, radius = 5):
+#     cv2.circle(frame, center, radius, (0,0,255), thickness=-1)
