@@ -21,7 +21,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from vanishpt import analyze, NoVanishingPointException
 from plates import getPlates, PlateRect
-#import pedestrians
+import pedestrians
 
 
 P_COEFF = -4
@@ -98,7 +98,7 @@ class image_converter:
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
-            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):# or pedestrians.hasPedestrian(cv_image):
+            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60) or pedestrians.hasPedestrian(cv_image):
                 rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
                 self.move.angular.z = 0
