@@ -54,6 +54,7 @@ class image_converter:
         self.lastTickTime = rospy.get_rostime()
         self.tickDuration = 0
         self.frame = None
+        self.frame2 = None
         self.move = Twist()
         self.localTurnHeading = 0
 
@@ -100,7 +101,7 @@ class image_converter:
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
             hasPedestrian, maskFrame = pedestrians.hasPedestrian(cv_image)
-            self.frame = maskFrame
+            self.frame2 = maskFrame
             if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60) or hasPedestrian:
                 rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
@@ -133,13 +134,14 @@ class image_converter:
             
         finally:
             #self.heading = self.heading % 17.6
-            self.pub.publish(self.move) #comment this out and robot will not move
+            #self.pub.publish(self.move) #commented out to drive robot manually
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
             cv2.putText(
                 self.frame, odomStr, (20,50), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,0,0), thickness=2
             )
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.frame, "bgr8"))
+            self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.frame2, "mono8"))
 
     def turnCorner(self):
         self.integral.clear()

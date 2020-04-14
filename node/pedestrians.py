@@ -2,7 +2,7 @@ import cv2
 from math import pi
 import numpy as np
 
-#need to set up driving robot manually
+#need to set up driving robot manually... changed spawn location in my_launch.launch
 #debug using rqt image view 
 
 # param: frame 
@@ -28,54 +28,59 @@ def hasPedestrian(frame):
     BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
     WIDTH = frame.shape[1]
     HEIGHT = frame.shape[0]
+    XBOUND = 10 #TODO: tune this 
     
     #Convert from BGR to HSV color-space
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # define range of brown color in HSV
-    #TODO: tune range of brown of pedestrian
+    # in downloads folder in terminal run ./hsv_threshold.py
+    # image must be named blacktape
     #lower_blue = np.array([110,50,50])
     #upper_blue = np.array([130,255,255])
-    lower_brown = np.array([10,100,20])
-    upper_brown = np.array([20,255,200])
+    lower_brown = np.array([5,50,50])
+    upper_brown = np.array([20,255,255])
 
     # Threshold the HSV image for the range of brown color (to get only brown colors)
     mask = cv2.inRange(hsv, lower_brown, upper_brown)
     
+    #return False, mask
     # Bitwise_AND on mask and original frame
     # In openCV, the value of the colour black is 0, so black + anycolour = anycolour
     # This will assign any pixels in our colour range a value 1 and everything else 0 (black)
-    res = cv2.bitwise_and(frame,frame, mask= mask)
+    #res = cv2.bitwise_and(frame,frame, mask= mask)
     
     # Strategy 1: mask to contour to bounding box to center of box
-    contours = getContours(res)
-    if len(contours) == 0:
-        return False, mask
-    else:
-        cnt = contours[0] # will this give us the pedestrian contour? or use...
+    #contours = getContours(mask)
+    #if len(contours) == 0:
+        #return False, mask
+    #else:
+        #cnt = contours[0] # will this give us the pedestrian contour? or use...
         #largestContour = max(contour, key = lambda contour: cv2.contourArea(contour))
     
     # want to check if a relevant pedestrian in the frame
     # if they are picked up but still quite far away, we dont want to trigger the stop
-    totalBrownpixels = cv.countNonZero(res)
+    totalBrownpixels = cv2.countNonZero(mask)
     if totalBrownpixels < BROWNPIXELTHRESH_MIN :
-        return True, mask
+        return False, mask
         #another stragety for this .... if cv2.contourArea(cnt) < 
     
-    pedestrian_CM = getCenterOfBoundingRectangle(cnt)
+    #pedestrian_CM = getCenterOfBoundingRectangle(largestContour)
 
     #Strategy 2: find CM location of pedestrian within frame___________
-    #i_acc = 0
-    #i_count = 0
-    #for i in range(0,WIDTH) :
-        #for j in range(0,HEIGHT) :
-            #if res[i][j] == 255 :
-                #i_acc += i
-                #i_count += 1
+    i_acc = 0
+    i_count = 0
+    for i in range(0,WIDTH) :
+        for j in range(0,HEIGHT) :
+            if mask[i][j] == 255 :
+                i_acc += i
+                i_count += 1
     
-    #pedestrian_CM = i_accumulated/i_count_______________________________________
+    pedestrian_CM = i_acc/i_count
 
-    if pedestrian_CM in range(10,WIDTH-10) :
+    rospy.logwarn(pedestrian_CM) #output value of CM to command line
+
+    if pedestrian_CM in range(XBOUND,WIDTH-XBOUND) :
         return True, mask
     return False, mask
 
