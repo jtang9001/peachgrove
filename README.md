@@ -1,6 +1,6 @@
 # 2019 Term 2 UBC Parking competition
 
-This is a simulation environment designed to match the real competition environment. You do not need to use it, though it might be helpful to test ideas and train control models.
+This is a modified simulation environment designed to match the real competition environment. Files have been added to allow for autonomous driving and license plate detection.
 
 ## Installation instructions:
 * If you **do not** have a catkin workspace, please create one. You can use any folder to create it in. The example below uses your home directory.
@@ -11,7 +11,7 @@ mkdir -p ~/353_ws/src
 * Clone the repository into the catkin workspace src folder.
 ```
 cd ~/353_ws/src
-git clone https://github.com/ENPH353/competition_2019t2.git
+git clone https://github.com/jtang9001/peachgrove.git
 ```
 
 * Build the packages
@@ -44,6 +44,7 @@ Once the simulation is started you can interact with it in multiple ways.
 ```
 rosrun teleop_twist_keyboard teleop_twist_keyboard.py 
 ```
+You may need to disable publishing of Twist messages within the driving nodes (bridge.py).
 
 * If you would like to watch the camera feed you can use rqt_image_view:
 ```
