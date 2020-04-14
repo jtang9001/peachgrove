@@ -44,6 +44,7 @@ class image_converter:
 
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image_vanishing_pt", Image, queue_size=1)
+        self.image_pub2 = rospy.Publisher("/annotated_image_mask", Image, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("rrbot/camera1/image_raw", Image, self.callback)
         self.integral = deque(maxlen=INTEGRAL_LENGTH)
@@ -98,7 +99,9 @@ class image_converter:
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
-            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60) or pedestrians.hasPedestrian(cv_image):
+            hasPedestrian, maskFrame = pedestrians.hasPedestrian(cv_image)
+            self.frame = maskFrame
+            if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60) or hasPedestrian:
                 rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
                 self.move.angular.z = 0
@@ -130,7 +133,7 @@ class image_converter:
             
         finally:
             #self.heading = self.heading % 17.6
-            self.pub.publish(self.move)
+            self.pub.publish(self.move) #comment this out and robot will not move
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
             cv2.putText(
                 self.frame, odomStr, (20,50), 
