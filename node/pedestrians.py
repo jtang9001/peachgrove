@@ -1,9 +1,14 @@
 import cv2
 from math import pi
 import numpy as np
+import rospy
 
 #need to set up driving robot manually... changed spawn location in my_launch.launch
 #debug using rqt image view 
+
+#DETERMING HSV ranges
+# in downloads folder in terminal run ./hsv_threshold.py
+# image must be named blacktape.png
 
 # param: frame 
     # source image, is a binary frame. findContours requires binary frame
@@ -19,32 +24,64 @@ def getCenterOfBoundingRectangle(contour):
     #(w,h) is width and height
     return x + (w/2)
 
+def getCentralBottomPixels(frame, nPixels):
+    height = frame.shape[0]
+    width = frame.shape[1]
+    return frame[height - nPixels:height, 100:width-100]
+
 # param: BGR OpenCV frame
 # return: true if there is a pedestrian in the frame 
 # (ie. should the car stop) and false otherwise
 def hasPedestrian(frame):
     
     #define some constants
-    BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
+    #BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
     WIDTH = frame.shape[1]
     HEIGHT = frame.shape[0]
-    XBOUND = 10 #TODO: tune this 
+    XBOUND = 10 
+    NPIXELS = 100
     
     #Convert from BGR to HSV color-space
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    # define range of brown color in HSV
-    # in downloads folder in terminal run ./hsv_threshold.py
-    # image must be named blacktape
-    #lower_blue = np.array([110,50,50])
-    #upper_blue = np.array([130,255,255])
-    lower_brown = np.array([5,50,50])
-    upper_brown = np.array([20,255,255])
+    lower_red = np.array([0,220,220])
+    upper_red = np.array([8,255,255])
+    mask_crosswalk = cv2.inRange(hsv, lower_red, upper_red)
+    bottomSeg = getCentralBottomPixels(mask_crosswalk, NPIXELS)
+    h, s, v = bottomSeg[:, :, 0], bottomSeg[:, :, 1], bottomSeg[:, :, 2] #parse the cropped, masked hsv image
 
-    # Threshold the HSV image for the range of brown color (to get only brown colors)
-    mask = cv2.inRange(hsv, lower_brown, upper_brown)
+    #check if robot is right in front of a crosswalk. If yes, run code inside. If no, return False. 
+    if cv2.CountNonZero(h) == h.size :
+
+        # define range of brown color in HSV
+        lower_brown = np.array([5,50,50])
+        upper_brown = np.array([20,255,255])
+        i_acc = 0
+        i_count = 0
+
+        # Threshold the HSV image for the range of brown color (to get only brown colors)
+        mask = cv2.inRange(hsv, lower_brown, upper_brown)
+
+        #find CM location of pedestrian within frame
+        for i in range(0,WIDTH) :
+            for j in range(0,HEIGHT) :
+                if mask[i][j] == 255 :
+                    i_acc += i
+                    i_count += 1
     
-    #return False, mask
+        pedestrian_CM = i_acc/i_count
+
+        rospy.logwarn(pedestrian_CM) #output value of CM to command line
+
+        #cv2.imshow('frame',frame)
+        #cv2.imshow('mask',mask)
+
+        if pedestrian_CM in range(XBOUND,WIDTH-XBOUND) :
+            return True, mask
+        return False, mask
+    else :
+        return False, mask_crosswalk
+    
     # Bitwise_AND on mask and original frame
     # In openCV, the value of the colour black is 0, so black + anycolour = anycolour
     # This will assign any pixels in our colour range a value 1 and everything else 0 (black)
@@ -60,43 +97,23 @@ def hasPedestrian(frame):
     
     # want to check if a relevant pedestrian in the frame
     # if they are picked up but still quite far away, we dont want to trigger the stop
-    totalBrownpixels = cv2.countNonZero(mask)
-    if totalBrownpixels < BROWNPIXELTHRESH_MIN :
-        return False, mask
+    #totalBrownpixels = cv2.countNonZero(mask)
+    #if totalBrownpixels < BROWNPIXELTHRESH_MIN :
+        #return False, mask
         #another stragety for this .... if cv2.contourArea(cnt) < 
     
     #pedestrian_CM = getCenterOfBoundingRectangle(largestContour)
-
-    #Strategy 2: find CM location of pedestrian within frame___________
-    i_acc = 0
-    i_count = 0
-    for i in range(0,WIDTH) :
-        for j in range(0,HEIGHT) :
-            if mask[i][j] == 255 :
-                i_acc += i
-                i_count += 1
-    
-    pedestrian_CM = i_acc/i_count
-
-    rospy.logwarn(pedestrian_CM) #output value of CM to command line
-
-    if pedestrian_CM in range(XBOUND,WIDTH-XBOUND) :
-        return True, mask
-    return False, mask
 
     # NOTE: For HSV, Hue range is [0,179], Saturation range is [0,255] and Value range is [0,255]. 
     # Different softwares use different scales. 
     # If you are comparing OpenCV values with them, you need to normalize these ranges.
     
-    #------------Additional Complexity------------------------
+#------------Additional Complexity------------------------
     # Pedestrian motion: crosses, stops, crosses back, stops
     # keep track of previous (20?) frames to track movement
     # use deque => if full (keep track of size), remove at one end before adding to top
     # monitor where white is in sea of black
 
-    #cv2.imshow('frame',frame)
-    #cv2.imshow('mask',mask)
-    #cv2.imshow('res',res)
    
 # #from lab 2
 #     binFrame = grayscaleThresh(getBottomPixels(hsvFrame, 100), 50)
@@ -121,10 +138,6 @@ def hasPedestrian(frame):
 #     satFrame = hsvFrame[:, :, 1]
 #     satBGRFrame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 #     return satFrame
-
-# def getBottomPixels(frame, nPixels = 100):
-#     yCoords = frame.shape[0]
-#     return frame[yCoords - nPixels:yCoords, :]
 
 # # "binarizes" the frame. Only 0 or 255 are left possible.
 # def grayscaleThresh(frame, threshold = 50):
