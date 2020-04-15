@@ -10,24 +10,10 @@ import rospy
 # in downloads folder in terminal run ./hsv_threshold.py
 # image must be named blacktape.png
 
-# param: frame 
-    # source image, is a binary frame. findContours requires binary frame
-    # RETR_LIST is contour retrieval mode
-    # CHAIN_APPROX_SIMPLE is contour approximation method
-# return: a modified image (is the first of three return parameters)
-def getContours(frame):
-    return cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
-
-def getCenterOfBoundingRectangle(contour):
-    x, y, w, h = cv2.boundingRect(contour)
-    #(x,y) is the top-left coordinate of the rectangle
-    #(w,h) is width and height
-    return x + (w/2)
-
 def getCentralBottomPixels(frame, nPixels):
     height = frame.shape[0]
     width = frame.shape[1]
-    return frame[height - nPixels:height, 100:width-100]
+    return frame[height - nPixels:height, 200:width-200]
 
 # param: BGR OpenCV frame
 # return: true if there is a pedestrian in the frame 
@@ -36,10 +22,10 @@ def hasPedestrian(frame):
     
     #define some constants
     #BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
-    WIDTH = frame.shape[1]
-    HEIGHT = frame.shape[0]
+    WIDTH = frame.shape[1] #640
+    HEIGHT = frame.shape[0] #480
     XBOUND = 10 
-    NPIXELS = 100
+    NPIXELS = 60
     
     #Convert from BGR to HSV color-space
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -48,11 +34,17 @@ def hasPedestrian(frame):
     upper_red = np.array([8,255,255])
     mask_crosswalk = cv2.inRange(hsv, lower_red, upper_red)
     bottomSeg = getCentralBottomPixels(mask_crosswalk, NPIXELS)
-    h, s, v = bottomSeg[:, :, 0], bottomSeg[:, :, 1], bottomSeg[:, :, 2] #parse the cropped, masked hsv image
+    rospy.loginfo(mask_crosswalk.shape)
+    rospy.loginfo(bottomSeg.shape)
+    
 
+    #h, s, v = bottomSeg[:][:][0], bottomSeg[:][:][1], bottomSeg[:][:][2] #parse the cropped, masked hsv image
+    #rospy.loginfo(h.shape)
+     
+    
     #check if robot is right in front of a crosswalk. If yes, run code inside. If no, return False. 
-    if cv2.CountNonZero(h) == h.size :
-
+    if bottomSeg.sum() == bottomSeg.shape[0]*bottomSeg.shape[1]*255:
+        rospy.loginfo("crosswalk detected")
         # define range of brown color in HSV
         lower_brown = np.array([5,50,50])
         upper_brown = np.array([20,255,255])
@@ -61,20 +53,17 @@ def hasPedestrian(frame):
 
         # Threshold the HSV image for the range of brown color (to get only brown colors)
         mask = cv2.inRange(hsv, lower_brown, upper_brown)
-
+        h, w = mask.shape
         #find CM location of pedestrian within frame
-        for i in range(0,WIDTH) :
-            for j in range(0,HEIGHT) :
-                if mask[i][j] == 255 :
+        for i in range(h) :
+            for j in range(w) :
+                if mask[i,j] == 255 :
                     i_acc += i
                     i_count += 1
     
         pedestrian_CM = i_acc/i_count
 
         rospy.logwarn(pedestrian_CM) #output value of CM to command line
-
-        #cv2.imshow('frame',frame)
-        #cv2.imshow('mask',mask)
 
         if pedestrian_CM in range(XBOUND,WIDTH-XBOUND) :
             return True, mask
@@ -113,6 +102,20 @@ def hasPedestrian(frame):
     # keep track of previous (20?) frames to track movement
     # use deque => if full (keep track of size), remove at one end before adding to top
     # monitor where white is in sea of black
+
+#def getCenterOfBoundingRectangle(contour):
+    #x, y, w, h = cv2.boundingRect(contour)
+    #(x,y) is the top-left coordinate of the rectangle
+    #(w,h) is width and height
+    #return x + (w/2)
+
+# param: frame 
+    # source image, is a binary frame. findContours requires binary frame
+    # RETR_LIST is contour retrieval mode
+    # CHAIN_APPROX_SIMPLE is contour approximation method
+# return: a modified image (is the first of three return parameters)
+#def getContours(frame):
+    #return cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
 
    
 # #from lab 2
