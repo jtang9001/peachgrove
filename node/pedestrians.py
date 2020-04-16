@@ -10,10 +10,10 @@ import rospy
 # in downloads folder in terminal run ./hsv_threshold.py
 # image must be named blacktape.png
 
-def getCentralBottomPixels(frame, nPixels):
+def getCentralBottomPixels(frame, verticalCrop = 80, horizontalMargin = 150):
     height = frame.shape[0]
     width = frame.shape[1]
-    return frame[height - nPixels:height, 200:width-200]
+    return frame[height - verticalCrop:height, horizontalMargin:width - horizontalMargin]
 
 # param: BGR OpenCV frame
 # return: true if there is a pedestrian in the frame 
@@ -24,8 +24,8 @@ def hasPedestrian(frame):
     #BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
     WIDTH = frame.shape[1] #640
     HEIGHT = frame.shape[0] #480
-    XBOUND = 200 
-    NPIXELS = 60
+    XBOUND = 100 
+    NPIXELS = 80
     SIDEWALK_THRESH = 6000
     
     #Convert from BGR to HSV color-space
@@ -36,6 +36,11 @@ def hasPedestrian(frame):
     mask_crosswalk = cv2.inRange(hsv, lower_red, upper_red)
     bottomSeg = getCentralBottomPixels(mask_crosswalk, NPIXELS)
     numRedPixels = cv2.countNonZero(bottomSeg)
+    cv2.putText(
+        mask_crosswalk, str(numRedPixels), (20,60), 
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.4, 255, thickness=2
+        )
     #rospy.loginfo(mask_crosswalk.shape)
     #rospy.loginfo(bottomSeg.shape)
     
@@ -55,14 +60,16 @@ def hasPedestrian(frame):
         # i_count = 0
 
         # Threshold the HSV image for the range of brown color (to get only brown colors)
-        mask = cv2.inRange(hsv, lower_brown, upper_brown)
+        skinMask = cv2.inRange(hsv, lower_brown, upper_brown)
+        dispMask = cv2.add(skinMask, mask_crosswalk)
 
-        moments = cv2.moments(mask, binaryImage=True)
+        moments = cv2.moments(skinMask, binaryImage=True)
         if moments["m00"] != 0:
-            pedestrian_CM = moments["m10"]/moments["m00"]
+            pedestrian_CM = int(round(moments["m10"]/moments["m00"]))
+            pedestrian_CY = int(round(moments["m01"]/moments["m00"]))
             if XBOUND <= pedestrian_CM <= WIDTH-XBOUND:
                 rospy.logwarn("Pedestrian detected")
-                return True, mask
+                return True, dispMask, pedestrian_CM, pedestrian_CY
         
         # h, w = mask.shape
         # #find CM location of pedestrian within frame
@@ -76,9 +83,9 @@ def hasPedestrian(frame):
 
         #rospy.logwarn(pedestrian_CM) #output value of CM to command line
         rospy.loginfo("No pedestrian")
-        return False, mask
+        return False, dispMask, None, None
     else:
-        return False, bottomSeg
+        return False, mask_crosswalk, None, None
     
     # Bitwise_AND on mask and original frame
     # In openCV, the value of the colour black is 0, so black + anycolour = anycolour

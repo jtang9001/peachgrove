@@ -62,8 +62,8 @@ def getAlnumChars(s):
     return ''.join(char for char in s if char.isalnum())
 
 
-aFromCands = "IilZzJSsGBOoe"
-numToCands = "1112235568000"
+aFromCands = "IilZzJSsGBOQoe"
+numToCands = "11122355680000"
 
 numFromCands = "12356780"
 alphaToCands = "IZJSGZBO"
@@ -87,6 +87,7 @@ class PlateReader:
     def callback(self,data):
         try:
             if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):
+                rospy.logwarn_once(self.plateStorage.renderPlates())
                 raise NoLicensePlatesException
 
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -96,16 +97,16 @@ class PlateReader:
             #cv2.drawContours(threshedFrame, [rect.contour for rect in rects], -1, (0,255,0), 2)
             #frame = threshedFrame
 
-            self.framenum += 1
-            if len(rectPairs) != 0:
-                rospy.loginfo("Frame " + str(self.framenum))
-                # if self.framenum - self.lastGoodFrame == 1:
-                #     #skip every other frame?
-                #     raise NoLicensePlatesException
+            # self.framenum += 1
+            # if len(rectPairs) != 0:
+            #     rospy.loginfo("Frame " + str(self.framenum))
+            #     # if self.framenum - self.lastGoodFrame == 1:
+            #     #     #skip every other frame?
+            #     #     raise NoLicensePlatesException
 
-                # self.lastGoodFrame = self.framenum
-                rospy.loginfo(self.plateStorage.renderPlates())
-                #rospy.loginfo(self.plateStorage.plates)
+            #     # self.lastGoodFrame = self.framenum
+            #     rospy.loginfo(self.plateStorage.renderPlates())
+            #     #rospy.loginfo(self.plateStorage.plates)
 
             stackedPlates = None
             for rectPair in rectPairs:
@@ -140,6 +141,7 @@ class PlateReader:
                 
             if stackedPlates is not None:
                 self.stackedPlates = stackedPlates
+                rospy.loginfo(self.plateStorage.renderPlates())
         
         except NoLicensePlatesException:
             pass

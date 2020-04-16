@@ -100,7 +100,7 @@ class image_converter:
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
-            hasPedestrian, maskFrame = pedestrians.hasPedestrian(cv_image)
+            hasPedestrian, maskFrame, pedX, pedY = pedestrians.hasPedestrian(cv_image)
             #rospy.loginfo(hasPedestrian)
             self.frame2 = cv2.cvtColor(maskFrame, cv2.COLOR_GRAY2BGR)
 
@@ -108,10 +108,16 @@ class image_converter:
                 #rospy.loginfo("In turning override")
                 self.twirl()
 
-            elif rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60) or hasPedestrian:
-                rospy.logwarn_once("Done!/Pedestrian detected!")
+            elif rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):
+                rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
                 self.move.angular.z = 0
+
+            elif hasPedestrian:
+                cv2.circle(self.frame, (pedX, pedY), 7, (0,200,255), thickness=2)
+                self.move.linear.x = 0
+                #self.move.angular.z = 0
+
             else:
                 self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
