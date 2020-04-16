@@ -24,9 +24,9 @@ def hasPedestrian(frame):
     #BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
     WIDTH = frame.shape[1] #640
     HEIGHT = frame.shape[0] #480
-    XBOUND = 50 
+    XBOUND = 200 
     NPIXELS = 60
-    SIDEWALK_THRESH = 3500
+    SIDEWALK_THRESH = 6000
     
     #Convert from BGR to HSV color-space
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)

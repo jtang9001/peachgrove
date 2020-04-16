@@ -40,7 +40,7 @@ class image_converter:
     def __init__(self):
         self.startTime = rospy.get_rostime()
 
-        rospy.sleep(5.)
+        rospy.sleep(3.)
 
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image_vanishing_pt", Image, queue_size=1)
