@@ -62,8 +62,8 @@ def getAlnumChars(s):
     return ''.join(char for char in s if char.isalnum())
 
 
-aFromCands = "IilZzJSsGBOQoe"
-numToCands = "11122355680000"
+aFromCands = "IilZzJSsGTBOQoe"
+numToCands = "111223556780000"
 
 numFromCands = "12356780"
 alphaToCands = "IZJSGZBO"
