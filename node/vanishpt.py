@@ -72,18 +72,6 @@ def drawLinesOnBlank(lines, width, height):
         line.drawInf(canvas, color = WHITE)
     return canvas
 
-# def findIntersections(frame):
-#     # delete lines
-#     kernel = np.ones((3,3),np.uint8)
-#     img2 = cv2.erode(frame,kernel,iterations = 1)
-#     # strengthen intersections
-#     kernel = np.ones((9,9),np.uint8)
-#     img2 = cv2.dilate(img2,kernel,iterations = 1)
-#     # close remaining blobs
-#     kernel = np.ones((11,11),np.uint8)
-#     cv2.morphologyEx(img2, cv2.MORPH_CLOSE, kernel)
-#     return img2
-
 def findVanishingPt(lines, width, height):
     uniqueLines = [lines[0]]
     for line in lines:

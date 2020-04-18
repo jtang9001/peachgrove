@@ -138,19 +138,6 @@ def auto_canny(image, sigma=.8):
 	return edged
 
 def threshImg(grayImg, exposure = -2, kernel_size = 75):
-    #blurImg = cv2.blur(grayImg, (3,3))
-    # threshedImg = cv2.adaptiveThreshold(
-    #     grayImg, 
-    #     255, 
-    #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-    #     cv2.THRESH_BINARY, 
-    #     kernel_size, 
-    #     exposure
-    # ) 
-    #_, threshedImg = cv2.threshold(grayImg, 95, 255, cv2.THRESH_BINARY_INV)
-    #kernel = np.ones((3,3), np.uint8) 
-    #dilatedImg = cv2.dilate(threshedImg, kernel, iterations=1)
-    #threshedImg = auto_canny(blurImg, sigma=0.1)
     threshedImg = cv2.Canny(grayImg, 30, 60)
     return threshedImg
 

@@ -94,20 +94,6 @@ class PlateReader:
 
             rectPairs, threshedFrame = getPlates(cv_image)
 
-            #cv2.drawContours(threshedFrame, [rect.contour for rect in rects], -1, (0,255,0), 2)
-            #frame = threshedFrame
-
-            # self.framenum += 1
-            # if len(rectPairs) != 0:
-            #     rospy.loginfo("Frame " + str(self.framenum))
-            #     # if self.framenum - self.lastGoodFrame == 1:
-            #     #     #skip every other frame?
-            #     #     raise NoLicensePlatesException
-
-            #     # self.lastGoodFrame = self.framenum
-            #     rospy.loginfo(self.plateStorage.renderPlates())
-            #     #rospy.loginfo(self.plateStorage.plates)
-
             stackedPlates = None
             for rectPair in rectPairs:
                 spotNum = None

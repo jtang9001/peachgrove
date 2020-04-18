@@ -92,10 +92,6 @@ class image_converter:
             self.integral.append(xFrac)
             intTerm = sum(self.integral)
 
-            # try:
-            #     derivTerm = self.integral[-1] - self.integral[-3]
-            # except Exception:
-            #     derivTerm = 0
 
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
@@ -116,17 +112,13 @@ class image_converter:
             elif hasPedestrian:
                 cv2.circle(self.frame, (pedX, pedY), 7, (0,200,255), thickness=2)
                 self.move.linear.x = 0
-                #self.move.angular.z = 0
+                self.move.angular.z = 0
 
             else:
                 self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
-                self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF# + derivTerm * D_COEFF
+                self.move.angular.z = xFrac*P_COEFF + intTerm*I_COEFF
 
-            # pidStr = "P = %(error).2f, I = %(integral).2f, D = %(deriv).2f" % {"error": xFrac, "integral": intTerm, "deriv": derivTerm}
-            # outStr = "v = %(vel).2f, w = %(ang).2f" % {"ang": self.move.angular.z, "vel": self.move.linear.x}
-            # cv2.putText(frame, pidStr, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,0,0), thickness=1)
-        
         except NoVanishingPointException:
             if self.localTurnHeading != 0:
                 self.twirl()
@@ -140,8 +132,7 @@ class image_converter:
             self.frame = cv_image
             
         finally:
-            #self.heading = self.heading % 17.6
-            self.pub.publish(self.move) #commented out to drive robot manually
+            self.pub.publish(self.move) #comment out to drive robot manually
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
             cv2.putText(
                 self.frame, odomStr, (20,50), 

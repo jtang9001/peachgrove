@@ -24,7 +24,7 @@ def hasPedestrian(frame):
     #BROWNPIXELTHRESH_MIN = 100 #TODO: tune this 
     WIDTH = frame.shape[1] #640
     HEIGHT = frame.shape[0] #480
-    XBOUND = 100 
+    XBOUND = 120 
     NPIXELS = 80
     SIDEWALK_THRESH = 6000
     
