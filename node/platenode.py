@@ -34,6 +34,8 @@ class PlateStorage:
             self.plateNumConf[plateNum - 1] += numConf
 
     def renderPlates(self):
+        #select parking spots with highest confidence, and return a composite string
+        #that reflects our best guess at the plates for those spots
         plateStrs = {}
         usedPlateStrs = set()
         highestConfSpots = sorted(
@@ -86,6 +88,7 @@ class PlateReader:
 
     def callback(self,data):
         try:
+            #stop if overtime
             if rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):
                 rospy.logwarn_once(self.plateStorage.renderPlates())
                 raise NoLicensePlatesException
@@ -106,9 +109,14 @@ class PlateReader:
 
                     if len(rectAlnum) == 3:
                         spotNum = int(rectAlnum[1:].translate(ALPHA_TO_NUM))
+                        if spotNum > 16: 
+                            #this may happen due to OCR mistake. 
+                            # Take the last digit in that case
+                            spotNum = spotNum % 10 
                         spotConf = conf
 
                     elif len(rectAlnum) == 4:
+                        #make appropriate fuzzing of letters into numbers/vice versa
                         plateLetters = rectAlnum[:2].translate(NUM_TO_ALPHA)
                         plateNumbers = rectAlnum[2:].translate(ALPHA_TO_NUM)
                         plateStr = (plateLetters + plateNumbers).upper()

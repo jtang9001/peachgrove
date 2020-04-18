@@ -40,7 +40,7 @@ class image_converter:
     def __init__(self):
         self.startTime = rospy.get_rostime()
 
-        rospy.sleep(3.)
+        rospy.sleep(3.) #give some time to read plate in starting position
 
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/annotated_image_vanishing_pt", Image, queue_size=1)
@@ -61,6 +61,7 @@ class image_converter:
     def callback(self,data):
 
         try:
+            # Record heading and odometer with time * velocity
             currentTime = rospy.get_rostime()
             self.tickDuration = (currentTime - self.lastTickTime).to_sec()
             self.lastTickTime = currentTime
@@ -73,8 +74,10 @@ class image_converter:
 
         self.move = Twist()
         try:
+            #get error for PID driving
             xFrac, vanishPtFrame = analyze(cv_image)
 
+            #detect license plates
             rectPairs, threshedFrame = getPlates(cv_image)
             for rectPair in rectPairs:
                 for rect in rectPair:
@@ -85,35 +88,37 @@ class image_converter:
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,0,0), thickness=2
             )
 
-            #cv2.drawContours(vanishPtFrame, [rect.contour for rect in rects], -1, (255,255,0), 2)
-
             self.frame = vanishPtFrame
 
             self.integral.append(xFrac)
             intTerm = sum(self.integral)
 
-
             turn_start = 2.4 if self.lengths % 4 == 1 else 2.6
             turn_minimum_radians = -14.5 if self.lengths % 4 == 1 else -14
 
+            #detect pedestrian
             hasPedestrian, maskFrame, pedX, pedY = pedestrians.hasPedestrian(cv_image)
             #rospy.loginfo(hasPedestrian)
             self.frame2 = cv2.cvtColor(maskFrame, cv2.COLOR_GRAY2BGR)
 
+            # twirl override
             if self.lengths % 2 == 1 and self.localTurnHeading > turn_minimum_radians and turn_start < self.odometer < turn_start + 0.25:
                 #rospy.loginfo("In turning override")
                 self.twirl()
 
+            # override for time expiry
             elif rospy.get_rostime() - self.startTime > rospy.Duration.from_sec(4*60):
                 rospy.logwarn_once("Done!")
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
+            # override for pedestrian
             elif hasPedestrian:
                 cv2.circle(self.frame, (pedX, pedY), 7, (0,200,255), thickness=2)
                 self.move.linear.x = 0
                 self.move.angular.z = 0
 
+            # drive normally
             else:
                 self.localTurnHeading = 0
                 self.move.linear.x = getSpeedFromError(xFrac)
@@ -132,6 +137,7 @@ class image_converter:
             self.frame = cv_image
             
         finally:
+            # publish debugging images and send Twist message
             self.pub.publish(self.move) #comment out to drive robot manually
             odomStr = "%(length)d: OD %(odom).2f, HD %(head).2f" % {"odom": self.odometer, "head": self.localTurnHeading, "length": self.lengths}
             cv2.putText(
@@ -142,10 +148,10 @@ class image_converter:
             self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.frame2, "bgr8"))
 
     def turnCorner(self):
+        # hardcoded right turn behavior
         self.integral.clear()
         self.move.linear.x = 0.05
         self.move.angular.z = -0.6
-        #cv2.putText(frame, "No vanishing point", (20,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
         if self.odometer > 3.5:
             self.odometer = 0
             self.lengths += 1
@@ -153,6 +159,7 @@ class image_converter:
             rospy.loginfo(self.lengths)
             
     def twirl(self, ang_vel = -0.6):
+        # hardcoded twirl behavior
         self.integral.clear()
         self.move.linear.x = 0.01
         self.move.angular.z = ang_vel

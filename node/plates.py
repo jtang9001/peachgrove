@@ -97,6 +97,7 @@ class PlateRect:
         self.angle = degToRad(self.angle)
 
     def perspectiveTransform(self):
+        # transform plate to look head-on and add border padding
         persFrame = cv2.resize(four_point_transform(self.frame, self.contour.reshape(4,2)), (260,120))
         persFrame = persFrame[10:111, 10:251]
         self.threshedPersFrame_rgb = persFrame
@@ -106,23 +107,21 @@ class PlateRect:
         return self.threshedPersFrame
 
     def ocrFrame(self):
+        # make call to Tesseract and report string, confidence
         self.threshedPersFrame_rgb = cv2.cvtColor(self.threshedPersFrame, cv2.COLOR_GRAY2RGB)
-        # self.ocrStr = pytesseract.image_to_string(
-        #     self.threshedPersFrame_rgb, config = TESSERACT_OPTS
-        # ).encode("ascii", "ignore")
         ocrDict = pytesseract.image_to_data(
             self.threshedPersFrame_rgb, config=TESSERACT_OPTS, 
             output_type=pytesseract.Output.DICT
         )
         self.ocrStr = ''.join(ocrDict[u"text"]).encode("ascii", "ignore")
-        self.ocrConf = np.mean([x for x in ocrDict[u"conf"] if int(x) > 0]) * log(self.contourArea, 10)
+        self.ocrConf = np.mean([x for x in ocrDict[u"conf"] if int(x) > 0]) * (self.contourArea**(0.5))
         return self.ocrStr, self.ocrConf
 
     def labelOnFrame(self, frame):
+        #draw license plate on given frame
         centerRounded = (int(self.center[0]), int(self.center[1]))
         cv2.drawContours(frame, [self.contour], -1, (255,255,0), 2)
-        # if hasattr(self, "ocrStr"):
-        #     cv2.putText(frame, self.ocrStr, self.center, cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), thickness=2)
+    
         posnStr = "%(x)d, %(y)d, %(area)d" % {"x": self.center[0], "y": self.center[1], "area": self.contourArea}
         cv2.putText(frame, posnStr, centerRounded, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,0,0), thickness=2)
 
@@ -137,7 +136,7 @@ def auto_canny(image, sigma=.8):
 	# return the edged image
 	return edged
 
-def threshImg(grayImg, exposure = -2, kernel_size = 75):
+def threshImg(grayImg):
     threshedImg = cv2.Canny(grayImg, 30, 60)
     return threshedImg
 
@@ -162,6 +161,7 @@ def getPlates(frame):
     for contour in contours:
         approxCnt = simplifyContour(contour)
         if len(approxCnt) == 4:
+            #filter for rectangles that are vaguely license-plate shaped
             plate = PlateRect(approxCnt, greyFrame)
             if all((
                 RECT_MIN_AREA <= plate.contourArea <= RECT_MAX_AREA,
@@ -174,6 +174,9 @@ def getPlates(frame):
     goodPlates = set()
     platesToRemove = set()
 
+    #since we are using Canny filter, discard rectangles 
+    # that are nested inside each other; approximate this
+    # by checking if their centers are approximately overlapping
     for i in range(len(rects)):
         for j in range(i+1, len(rects)):
             rectA = rects[i]
@@ -187,6 +190,7 @@ def getPlates(frame):
 
     rects = list(set(rects) - platesToRemove)
 
+    # report only rectangles that have a corresponding plate above/below them
     for i in range(len(rects)):
         for j in range(i+1, len(rects)):
             rectA = rects[i]

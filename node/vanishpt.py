@@ -32,18 +32,21 @@ class Line:
         return (y - self.y1)/self.slope + self.x1
     
     def findIsectWith(self, other):
+        #find intersection of this line with another line
         if self.slope == other.slope:
             return None
         isectX = (other.y1 - self.y1 - other.slope*other.x1 + self.slope*self.x1)/(self.slope - other.slope)
         return (isectX, self.evalForX(isectX))
 
     def draw(self, frame, color = GREEN, thickness = 1):
+        #draw on given frame
         cv2.line(
             frame, (self.x1, self.y1), (self.x2, self.y2),
             color, thickness
         )
     
     def drawInf(self, frame, color = GREEN, thickness = 1):
+        # extend to edges of frame and draw
         height, width = frame.shape[:2]
         infStartX = -100
         infStartY = int(round(self.evalForX(infStartX)))
@@ -74,6 +77,7 @@ def drawLinesOnBlank(lines, width, height):
 
 def findVanishingPt(lines, width, height):
     uniqueLines = [lines[0]]
+    #start by generating a set of lines that are not too similar
     for line in lines:
         addLine = True
 
@@ -87,8 +91,12 @@ def findVanishingPt(lines, width, height):
 
     isects = []
     weights = []
+    #now compute the average of where the lines intersect
     for lineA, lineB in itertools.combinations(uniqueLines, 2):
         isect = lineA.findIsectWith(lineB)
+        #we expect the center of mass to be in the middle of the image, 
+        # if we divide the image into thirds horizontally
+        # due to the camera's angle
         if isect is not None and 0 <= isect[0] <= width and height*0.35 <= isect[1] <= height*0.65:
             isects.append(isect)
             weights.append(abs(lineA.slope - lineB.slope))
@@ -100,6 +108,7 @@ def findVanishingPt(lines, width, height):
 def analyze(frame):
     height, width = frame.shape[:2]
 
+    #generate a set of lines found in the image
     grayImg = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     edgedImg = auto_canny(grayImg)
 
@@ -114,6 +123,8 @@ def analyze(frame):
     #retFrame = cv2.cvtColor(edgedImg, cv2.COLOR_GRAY2BGR)
     retFrame = frame.copy()
 
+    #eliminate vertical or horizontal lines since they will not be useful for
+    #computing vanishing point
     diagLines = []
     for line in lines:
         #x1, y1, x2, y2 = line[0]
@@ -126,6 +137,7 @@ def analyze(frame):
     except (ZeroDivisionError, IndexError):
         raise NoVanishingPointException
 
+    #draw debugging information on the frame
     for line in uniqueLines:
         line.drawInf(retFrame)
     cv2.circle(retFrame, (int(round(vanishPt[0])), int(round(vanishPt[1]))), 5, RED, -1)

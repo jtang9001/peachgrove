@@ -43,11 +43,9 @@ def hasPedestrian(frame):
         )
     #rospy.loginfo(mask_crosswalk.shape)
     #rospy.loginfo(bottomSeg.shape)
-    
 
     #h, s, v = bottomSeg[:][:][0], bottomSeg[:][:][1], bottomSeg[:][:][2] #parse the cropped, masked hsv image
     #rospy.loginfo(h.shape)
-     
     
     #check if robot is right in front of a crosswalk. If yes, run code inside. If no, return False. 
     #if bottomSeg.sum() == bottomSeg.shape[0]*bottomSeg.shape[1]*255:
@@ -63,6 +61,7 @@ def hasPedestrian(frame):
         skinMask = cv2.inRange(hsv, lower_brown, upper_brown)
         dispMask = cv2.add(skinMask, mask_crosswalk)
 
+        # compute center of mass of skin mask efficiently
         moments = cv2.moments(skinMask, binaryImage=True)
         if moments["m00"] != 0:
             pedestrian_CM = int(round(moments["m10"]/moments["m00"]))
@@ -71,15 +70,6 @@ def hasPedestrian(frame):
                 rospy.logwarn("Pedestrian detected")
                 return True, dispMask, pedestrian_CM, pedestrian_CY
         
-        # h, w = mask.shape
-        # #find CM location of pedestrian within frame
-        # for i in range(h) :
-        #     for j in range(w) :
-        #         if mask[i,j] == 255 :
-        #             i_acc += i
-        #             i_count += 1
-    
-        # pedestrian_CM = i_acc/i_count
 
         #rospy.logwarn(pedestrian_CM) #output value of CM to command line
         rospy.loginfo("No pedestrian")
